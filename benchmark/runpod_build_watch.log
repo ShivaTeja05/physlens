@@ -1,0 +1,20 @@
+[   0s] build 8022535: UPLOADING
+[  31s] build 8022535: COMPLETED
+{
+ "status": "COMPLETED",
+ "error": null,
+ "completedAt": "2026-11-03T13:59:59.358Z"
+}
+
+=== build finished; waiting for the release to roll out, then running the 1 m tape test ===
+rollout: {'inProgress': False, 'percentOnLatest': 100, 'workersOnLatest': 1, 'workersTotal': 1}
+running MapAnything on one 720x576 frame (the very first call installs it on the GPU worker: several minutes)…
+
+TAPE  true 1.000 m · measured 0.879 m · error -12.1%
+      camera-to-wall distance ≈ 3.17 m
+DOOR  height ≈ 0.62 m  (SAM mask 48406 px)
+PERSON height ≈ 3.06 m  (SAM mask 15177 px)
+
+spend: {'spent_usd': 1.3248, 'cap_usd': 50.0, 'calls': 7, 'by_model': {'estimate-before-meter': 1.25, 'muse-spark-1.3': 0.0418, 'sam-3.1': 0.033}}
+ 
+watcher exit 0

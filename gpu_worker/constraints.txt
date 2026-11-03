@@ -1,0 +1,5 @@
+# Keep the PyTorch build that ships in the base image (RunPod's torch 2.8 / CUDA 12.8). Without these, an unpinned
+# torchaudio in uniception (a MapAnything dependency) can pull a different torch build than the GPU drivers support.
+torch==2.8.0
+torchvision==0.23.0
+torchaudio==2.8.0

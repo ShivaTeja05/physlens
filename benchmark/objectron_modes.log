@@ -1,0 +1,59 @@
+[   0s] build 33e33b1: PENDING
+[  31s] build 33e33b1: BUILDING
+[  64s] build 33e33b1: BUILDING
+[  95s] build 33e33b1: BUILDING
+[ 125s] build 33e33b1: BUILDING
+[ 156s] build 33e33b1: BUILDING
+[ 186s] build 33e33b1: BUILDING
+[ 217s] build 33e33b1: BUILDING
+[ 247s] build 33e33b1: BUILDING
+[ 278s] build 33e33b1: BUILDING
+[ 309s] build 33e33b1: BUILDING
+[ 339s] build 33e33b1: BUILDING
+[ 370s] build 33e33b1: BUILDING
+[ 400s] build 33e33b1: BUILDING
+[ 431s] build 33e33b1: BUILDING
+[ 462s] build 33e33b1: BUILDING
+[ 492s] build 33e33b1: BUILDING
+[ 523s] build 33e33b1: BUILDING
+[ 553s] build 33e33b1: BUILDING
+[ 584s] build 33e33b1: BUILDING
+[ 615s] build 33e33b1: COMPLETED
+rollout: {'inProgress': False, 'percentOnLatest': 100, 'workersOnLatest': 1, 'workersTotal': 1}
+
+===== focal =====
+mode: focal
+book_batch-20_35       SAM IoU 0.89 | measured/true m: 1.794/0.240  0.114/0.020*  1.081/0.150 | scale ×7.341 | distance 1.91/0.24 m
+book_batch-6_16        SAM IoU 0.77 | measured/true m: 1.196/0.180  0.241/0.040*  0.789/0.120 | scale ×6.609 | distance 2.02/0.26 m
+bottle_batch-3_14      SAM IoU 0.46 | measured/true m: 0.092/0.080  0.425/0.260  0.082/0.080 | scale ×1.149 | distance 0.77/0.40 m
+bottle_batch-40_29     SAM IoU 0.43 | measured/true m: 0.074/0.080  0.431/0.295*  0.086/0.080 | scale ×1.002 | distance 0.40/0.31 m
+chair_batch-13_44      SAM IoU 0.38 | measured/true m: 0.645/0.470  0.732/0.710*  0.633/0.490 | scale ×1.332 | distance 1.51/1.14 m
+chair_batch-24_14      SAM IoU 0.55 | measured/true m: 0.640/0.860  0.506/0.810  0.610/0.700* | scale ×0.684 | distance 1.36/1.31 m
+cup_batch-16_47        SAM IoU 0.66 | measured/true m: 0.428/0.070  0.563/0.110*  0.538/0.070 | scale ×6.907 | distance 1.88/0.24 m
+cup_batch-37_28        SAM IoU 0.62 | measured/true m: 0.314/0.099  0.387/0.114  0.380/0.089* | scale ×3.269 | distance 1.21/0.30 m
+laptop_batch-37_20     SAM IoU 0.86 | measured/true m: 0.361/0.333  0.246/0.191  0.399/0.310* | scale ×1.188 | distance 0.79/0.51 m
+laptop_batch-3_14      SAM IoU 0.96 | measured/true m: 0.434/0.373  0.015/0.010*  0.295/0.248 | scale ×1.177 | distance 0.58/0.58 m
+
+(* = side mostly along the view direction: not scored)
+SUMMARY {"clips": 10, "measured": 10, "median_abs_size_error_pct": 37.2, "sides_within_10pct": "4/21", "sides_within_20pct": "7/21", "median_scale": 1.26}
+spend: {'spent_usd': 1.3848, 'cap_usd': 50.0, 'calls': 31, 'by_model': {'estimate-before-meter': 1.25, 'muse-spark-1.3': 0.0418, 'sam-3.1': 0.093}}
+
+
+===== motion =====
+mode: motion
+book_batch-20_35       SAM IoU 0.89 | measured/true m: 0.221/0.240  0.015/0.020*  0.132/0.150 | scale ×0.899 | distance 0.24/0.24 m
+book_batch-6_16        SAM IoU 0.77 | measured/true m: 0.122/0.180  0.021/0.040*  0.080/0.120 | scale ×0.673 | distance 0.19/0.26 m
+bottle_batch-3_14      SAM IoU 0.46 | measured/true m: 0.045/0.080  0.214/0.260  0.041/0.080 | scale ×0.566 | distance 0.40/0.40 m
+bottle_batch-40_29     SAM IoU 0.43 | measured/true m: 0.051/0.080  0.254/0.295*  0.051/0.080 | scale ×0.635 | distance 0.23/0.31 m
+chair_batch-13_44      SAM IoU 0.38 | measured/true m: 0.359/0.470  0.441/0.710*  0.415/0.490 | scale ×0.805 | distance 0.99/1.14 m
+chair_batch-24_14      SAM IoU 0.55 | measured/true m: 0.853/0.860  0.734/0.810  0.807/0.700* | scale ×0.949 | distance 1.20/1.31 m
+cup_batch-16_47        SAM IoU 0.66 | measured/true m: 0.056/0.070  0.077/0.110*  0.073/0.070 | scale ×0.922 | distance 0.24/0.24 m
+cup_batch-37_28        SAM IoU 0.62 | measured/true m: 0.080/0.099  0.107/0.114  0.095/0.089* | scale ×0.871 | distance 0.30/0.30 m
+laptop_batch-37_20     SAM IoU 0.86 | measured/true m: 0.251/0.333  0.173/0.191  0.261/0.310* | scale ×0.831 | distance 0.54/0.51 m
+laptop_batch-3_14      SAM IoU 0.96 | measured/true m: 0.406/0.373  0.019/0.010*  0.266/0.248 | scale ×1.079 | distance 0.50/0.58 m
+
+(* = side mostly along the view direction: not scored)
+SUMMARY {"clips": 10, "measured": 10, "median_abs_size_error_pct": 17.8, "sides_within_10pct": "8/21", "sides_within_20pct": "13/21", "median_scale": 0.851}
+spend: {'spent_usd': 1.3848, 'cap_usd': 50.0, 'calls': 31, 'by_model': {'estimate-before-meter': 1.25, 'muse-spark-1.3': 0.0418, 'sam-3.1': 0.093}}
+
+exit 0

@@ -1,0 +1,34 @@
+{
+  "bike": {
+    "label": "Motorbike",
+    "credit": "Frame: Google Objectron (C-UDA-1.0), computational use"
+  },
+  "camera": {
+    "label": "Camera",
+    "credit": "Frame: Google Objectron (C-UDA-1.0), computational use"
+  },
+  "shoe": {
+    "label": "Shoe",
+    "credit": "Frame: Google Objectron (C-UDA-1.0), computational use"
+  },
+  "chair": {
+    "label": "Chair",
+    "credit": "Frame: Google Objectron (C-UDA-1.0), computational use"
+  },
+  "classroom": {
+    "label": "Classroom drop",
+    "credit": "Video: Loo Kang Wee, ComPADRE \u00b7 CC BY 3.0"
+  },
+  "building": {
+    "label": "Apartment block",
+    "credit": "Photo: Wilfredor \u00b7 CC0 \u00b7 Wikimedia Commons"
+  },
+  "moon": {
+    "label": "First-quarter Moon",
+    "credit": "Photo: NASA Goddard Space Flight Center from Greenbelt, MD, USA \u00b7 CC BY 2.0 \u00b7 Wikimedia Commons"
+  },
+  "basketball": {
+    "label": "Basketball",
+    "credit": "Photo: U.S. Air Force Photo by Justin R. Pacheco \u00b7 Public domain \u00b7 Wikimedia Commons"
+  }
+}

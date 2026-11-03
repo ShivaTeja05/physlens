@@ -1,0 +1,302 @@
+{
+  "summary": {
+    "clips": 10,
+    "measured": 10,
+    "median_abs_size_error_pct": 42.1,
+    "sides_within_10pct": "2/22",
+    "sides_within_20pct": "5/22",
+    "median_scale": 1.545
+  },
+  "rows": [
+    {
+      "clip": "book_batch-20_35",
+      "category": "book",
+      "frame": 141,
+      "sam_iou": 0.894,
+      "sides": [
+        {
+          "true_m": 0.24,
+          "measured_m": 1.3908,
+          "scored": true,
+          "ratio": 5.795
+        },
+        {
+          "true_m": 0.02,
+          "measured_m": 0.1504,
+          "scored": false,
+          "ratio": 7.519
+        },
+        {
+          "true_m": 0.15,
+          "measured_m": 1.142,
+          "scored": true,
+          "ratio": 7.613
+        }
+      ],
+      "median_ratio": 6.704,
+      "true_distance_m": 0.242,
+      "measured_distance_m": 1.357
+    },
+    {
+      "clip": "book_batch-6_16",
+      "category": "book",
+      "frame": 116,
+      "sam_iou": 0.767,
+      "sides": [
+        {
+          "true_m": 0.18,
+          "measured_m": 1.1021,
+          "scored": true,
+          "ratio": 6.123
+        },
+        {
+          "true_m": 0.04,
+          "measured_m": 0.4003,
+          "scored": false,
+          "ratio": 10.007
+        },
+        {
+          "true_m": 0.12,
+          "measured_m": 0.9403,
+          "scored": true,
+          "ratio": 7.836
+        }
+      ],
+      "median_ratio": 6.979,
+      "true_distance_m": 0.263,
+      "measured_distance_m": 1.647
+    },
+    {
+      "clip": "bottle_batch-3_14",
+      "category": "bottle",
+      "frame": 59,
+      "sam_iou": 0.456,
+      "sides": [
+        {
+          "true_m": 0.08,
+          "measured_m": 0.1025,
+          "scored": true,
+          "ratio": 1.281
+        },
+        {
+          "true_m": 0.26,
+          "measured_m": 0.334,
+          "scored": true,
+          "ratio": 1.285
+        },
+        {
+          "true_m": 0.08,
+          "measured_m": 0.0875,
+          "scored": true,
+          "ratio": 1.094
+        }
+      ],
+      "median_ratio": 1.281,
+      "true_distance_m": 0.395,
+      "measured_distance_m": 0.652
+    },
+    {
+      "clip": "bottle_batch-40_29",
+      "category": "bottle",
+      "frame": 131,
+      "sam_iou": 0.427,
+      "sides": [
+        {
+          "true_m": 0.08,
+          "measured_m": 0.1298,
+          "scored": true,
+          "ratio": 1.623
+        },
+        {
+          "true_m": 0.2946,
+          "measured_m": 0.4516,
+          "scored": false,
+          "ratio": 1.533
+        },
+        {
+          "true_m": 0.0804,
+          "measured_m": 0.15,
+          "scored": true,
+          "ratio": 1.867
+        }
+      ],
+      "median_ratio": 1.745,
+      "true_distance_m": 0.311,
+      "measured_distance_m": 0.391
+    },
+    {
+      "clip": "chair_batch-13_44",
+      "category": "chair",
+      "frame": 148,
+      "sam_iou": 0.376,
+      "sides": [
+        {
+          "true_m": 0.47,
+          "measured_m": 0.5581,
+          "scored": true,
+          "ratio": 1.187
+        },
+        {
+          "true_m": 0.71,
+          "measured_m": 0.6587,
+          "scored": true,
+          "ratio": 0.928
+        },
+        {
+          "true_m": 0.49,
+          "measured_m": 0.6757,
+          "scored": true,
+          "ratio": 1.379
+        }
+      ],
+      "median_ratio": 1.187,
+      "true_distance_m": 1.136,
+      "measured_distance_m": 1.191
+    },
+    {
+      "clip": "chair_batch-24_14",
+      "category": "chair",
+      "frame": 127,
+      "sam_iou": 0.546,
+      "sides": [
+        {
+          "true_m": 0.8599,
+          "measured_m": 0.9575,
+          "scored": true,
+          "ratio": 1.113
+        },
+        {
+          "true_m": 0.8102,
+          "measured_m": 0.6161,
+          "scored": true,
+          "ratio": 0.76
+        },
+        {
+          "true_m": 0.7004,
+          "measured_m": 0.6997,
+          "scored": false,
+          "ratio": 0.999
+        }
+      ],
+      "median_ratio": 0.936,
+      "true_distance_m": 1.315,
+      "measured_distance_m": 0.984
+    },
+    {
+      "clip": "cup_batch-16_47",
+      "category": "cup",
+      "frame": 134,
+      "sam_iou": 0.662,
+      "sides": [
+        {
+          "true_m": 0.07,
+          "measured_m": 0.5051,
+          "scored": true,
+          "ratio": 7.215
+        },
+        {
+          "true_m": 0.11,
+          "measured_m": 0.5813,
+          "scored": false,
+          "ratio": 5.285
+        },
+        {
+          "true_m": 0.07,
+          "measured_m": 0.5311,
+          "scored": true,
+          "ratio": 7.587
+        }
+      ],
+      "median_ratio": 7.401,
+      "true_distance_m": 0.236,
+      "measured_distance_m": 1.868
+    },
+    {
+      "clip": "cup_batch-37_28",
+      "category": "cup",
+      "frame": 132,
+      "sam_iou": 0.623,
+      "sides": [
+        {
+          "true_m": 0.0993,
+          "measured_m": 0.3838,
+          "scored": true,
+          "ratio": 3.865
+        },
+        {
+          "true_m": 0.1144,
+          "measured_m": 0.3888,
+          "scored": true,
+          "ratio": 3.398
+        },
+        {
+          "true_m": 0.0893,
+          "measured_m": 0.3964,
+          "scored": false,
+          "ratio": 4.44
+        }
+      ],
+      "median_ratio": 3.631,
+      "true_distance_m": 0.301,
+      "measured_distance_m": 1.202
+    },
+    {
+      "clip": "laptop_batch-37_20",
+      "category": "laptop",
+      "frame": 197,
+      "sam_iou": 0.862,
+      "sides": [
+        {
+          "true_m": 0.3325,
+          "measured_m": 0.4305,
+          "scored": true,
+          "ratio": 1.295
+        },
+        {
+          "true_m": 0.1907,
+          "measured_m": 0.2161,
+          "scored": true,
+          "ratio": 1.133
+        },
+        {
+          "true_m": 0.3105,
+          "measured_m": 0.3596,
+          "scored": false,
+          "ratio": 1.158
+        }
+      ],
+      "median_ratio": 1.214,
+      "true_distance_m": 0.51,
+      "measured_distance_m": 0.833
+    },
+    {
+      "clip": "laptop_batch-3_14",
+      "category": "laptop",
+      "frame": 189,
+      "sam_iou": 0.965,
+      "sides": [
+        {
+          "true_m": 0.373,
+          "measured_m": 0.5458,
+          "scored": true,
+          "ratio": 1.463
+        },
+        {
+          "true_m": 0.0104,
+          "measured_m": 0.0211,
+          "scored": false,
+          "ratio": 2.025
+        },
+        {
+          "true_m": 0.2479,
+          "measured_m": 0.3044,
+          "scored": true,
+          "ratio": 1.228
+        }
+      ],
+      "median_ratio": 1.345,
+      "true_distance_m": 0.584,
+      "measured_distance_m": 0.462
+    }
+  ]
+}

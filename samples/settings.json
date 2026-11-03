@@ -1,0 +1,36 @@
+{
+  "drop-real": {
+    "label": "Real drop",
+    "experiment": "drop"
+  },
+  "drop-slowmo-2x": {
+    "label": "Slow-mo 2×",
+    "experiment": "drop"
+  },
+  "drop-low-gravity": {
+    "label": "Mystery clip",
+    "experiment": "drop"
+  },
+  "real-classroom-drop": {
+    "label": "Real classroom drop",
+    "px_per_m": 161.143,
+    "credit": "Video: Loo Kang Wee, ComPADRE · CC BY 3.0",
+    "experiment": "drop"
+  },
+  "cup-catch": {
+    "label": "Catch the cup",
+    "experiment": "cup"
+  },
+  "mystery-cans": {
+    "label": "Mystery Cans",
+    "experiment": "cans"
+  },
+  "weigh-springs": {
+    "label": "Weigh it by watching",
+    "experiment": "weigh",
+    "params": {
+      "true_mass_g": 250
+    },
+    "credit": "Kitchen-scale reading for this clip: 250 g"
+  }
+}

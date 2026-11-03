@@ -1,0 +1,159 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://physlens.dev/contract/events.schema.json",
+  "title": "PhysLens event stream",
+  "description": "Every message the engine sends to the stage display, operator console and narrator. One JSON object per line in replay logs (.jsonl). Coordinates: *_px are image pixels (origin top-left, y down); *_m are metres in the world frame (y up). t is seconds of video time.",
+  "type": "object",
+  "required": ["run_id", "t", "type"],
+  "properties": {
+    "run_id": { "type": "string" },
+    "t": { "type": "number", "minimum": 0 },
+    "type": {
+      "enum": ["run_state", "calibration", "track", "hypothesis", "fit", "memory_vs_eyes", "prediction", "verdict", "explain", "narration", "measurement", "law"]
+    }
+  },
+  "oneOf": [
+    {
+      "properties": {
+        "type": { "const": "run_state" },
+        "state": { "enum": ["created", "tracking", "measuring", "hypothesizing", "locked", "verifying", "done", "error"] },
+        "message": { "type": "string" },
+        "video": {
+          "type": "object",
+          "properties": {
+            "url": { "type": "string" },
+            "fps": { "type": "number" },
+            "width": { "type": "integer" },
+            "height": { "type": "integer" },
+            "duration": { "type": "number" }
+          }
+        }
+      },
+      "required": ["state"]
+    },
+    {
+      "properties": {
+        "type": { "const": "calibration" },
+        "method": { "enum": ["known_object", "board", "gravity"] },
+        "px_per_m": { "type": "number" },
+        "rel_uncertainty": { "type": "number" }
+      },
+      "required": ["method", "px_per_m", "rel_uncertainty"]
+    },
+    {
+      "properties": {
+        "type": { "const": "track" },
+        "objects": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["id", "label", "x_px", "y_px", "r_px"],
+            "properties": {
+              "id": { "type": "string" },
+              "label": { "type": "string" },
+              "x_px": { "type": "number" },
+              "y_px": { "type": "number" },
+              "r_px": { "type": "number" },
+              "x_m": { "type": "number" },
+              "y_m": { "type": "number" },
+              "vx": { "type": "number" },
+              "vy": { "type": "number" }
+            }
+          }
+        }
+      },
+      "required": ["objects"]
+    },
+    {
+      "properties": {
+        "type": { "const": "hypothesis" },
+        "topic": { "enum": ["motion", "bounce"], "description": "which question the laws answer; absent means motion" },
+        "candidates": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["name", "equation", "score"],
+            "properties": {
+              "name": { "type": "string" },
+              "equation": { "type": "string" },
+              "score": { "type": "number", "description": "relative likelihood 0..1 (Akaike weight)" },
+              "aic": { "type": "number" }
+            }
+          }
+        }
+      },
+      "required": ["candidates"]
+    },
+    {
+      "properties": {
+        "type": { "const": "fit" },
+        "id": { "type": "string" },
+        "model": { "type": "string" },
+        "params": {
+          "type": "object",
+          "additionalProperties": { "type": "array", "items": { "type": "number" }, "minItems": 2, "maxItems": 2, "description": "[value, 1-sigma error]" }
+        },
+        "rmse_m": { "type": "number" },
+        "window": { "type": "array", "items": { "type": "number" }, "minItems": 2, "maxItems": 2 }
+      },
+      "required": ["id", "model", "params"]
+    },
+    {
+      "properties": {
+        "type": { "const": "memory_vs_eyes" },
+        "quantity": { "type": "string" },
+        "unit": { "type": "string" },
+        "memory_value": { "type": "number" },
+        "eyes_value": { "type": "number" },
+        "eyes_err": { "type": "number" },
+        "memory_text": { "type": "string" },
+        "eyes_text": { "type": "string" }
+      },
+      "required": ["quantity", "memory_value", "eyes_value"]
+    },
+    {
+      "properties": {
+        "type": { "const": "prediction" },
+        "id": { "type": "string" },
+        "text": { "type": "string" },
+        "quantity": { "type": "string" },
+        "value": { "type": "number" },
+        "unit": { "type": "string" },
+        "ci90": { "type": "array", "items": { "type": "number" }, "minItems": 2, "maxItems": 2 },
+        "target_t": { "type": "number", "description": "video time when the outcome happens" },
+        "based_on_until_t": { "type": "number", "description": "the engine only used frames up to this video time" },
+        "ghost": { "type": "array", "items": { "type": "array", "items": { "type": "number" }, "minItems": 3, "maxItems": 3 }, "description": "[t, x_px, y_px] predicted path" },
+        "hash": { "type": "string" },
+        "locked_at": { "type": "string" }
+      },
+      "required": ["id", "text", "value", "ci90", "target_t", "based_on_until_t", "hash", "locked_at"]
+    },
+    {
+      "properties": {
+        "type": { "const": "verdict" },
+        "id": { "type": "string" },
+        "actual": { "type": "number" },
+        "hit": { "type": "boolean" },
+        "error": { "type": "number" }
+      },
+      "required": ["id", "actual", "hit"]
+    },
+    {
+      "properties": {
+        "type": { "const": "explain" },
+        "text": { "type": "string" },
+        "evidence": { "type": "array", "items": { "type": "string" } },
+        "verified": { "type": "boolean", "description": "every number in text was found in the evidence" },
+        "source": { "enum": ["muse_spark", "template"] }
+      },
+      "required": ["text", "evidence", "verified"]
+    },
+    {
+      "properties": {
+        "type": { "const": "narration" },
+        "text": { "type": "string" }
+      },
+      "required": ["text"]
+    }
+  ]
+}

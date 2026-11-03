@@ -1,0 +1,448 @@
+{
+  "real": {
+    "truth": {
+      "g": 9.81,
+      "playback": "real-time",
+      "upside_down": false
+    },
+    "muse_spark": {
+      "gravity_m_s2": 9.8,
+      "speed_kept_per_bounce": 0.8,
+      "playback": "real-time",
+      "upside_down": false,
+      "reasoning": "ball accelerates down at ~9.8 m/s2 per 1m/161px scale and rebounds lower each time, scene upright",
+      "_seconds": 31.3
+    },
+    "muse_spark_score": {
+      "g_rel_err": 0.0010193679918450342,
+      "g_ok": true,
+      "playback_ok": true,
+      "upside_ok": true
+    },
+    "physlens": {
+      "gravity_m_s2": 9.728720007370203,
+      "g_err": 0.2056528526489705,
+      "speed_kept_per_bounce": 0.6906,
+      "playback": "real-time",
+      "upside_down": false,
+      "verdicts": [
+        {
+          "id": "peak",
+          "actual": 20.18,
+          "hit": true,
+          "error": -0.10000000000000142
+        },
+        {
+          "id": "landing",
+          "actual": 2.4517,
+          "hit": true,
+          "error": 0.0054000000000002935
+        }
+      ],
+      "tracker": "sam-3.1",
+      "explanation": "This ball gets bouncier on softer hits \u2014 keeping 61.46% of its speed from a 6.43 m/s slam but 69.06% of its speed from a 3.95 m/s hit! We nailed the next bounce, predicting 20.28 cm and seeing 20.18 cm.",
+      "_seconds": 29.0
+    },
+    "physlens_score": {
+      "g_rel_err": 0.008285422286421748,
+      "g_ok": true,
+      "playback_ok": true,
+      "upside_ok": true
+    }
+  },
+  "slow-mo 2\u00d7": {
+    "truth": {
+      "g": 2.4525,
+      "playback": "slow-motion",
+      "upside_down": false
+    },
+    "muse_spark": {
+      "gravity_m_s2": 0.3,
+      "speed_kept_per_bounce": 0.75,
+      "playback": "slow-motion",
+      "upside_down": false,
+      "reasoning": "~2m drop from hand to floor takes ~4s video time => g~0.3 <<9.8 so slow-motion; man upright; bounce heights decrease",
+      "_seconds": 30.3
+    },
+    "muse_spark_score": {
+      "g_rel_err": 0.8776758409785933,
+      "g_ok": false,
+      "playback_ok": true,
+      "upside_ok": true
+    },
+    "physlens": {
+      "gravity_m_s2": 2.476232180923222,
+      "g_err": 0.05399793669798597,
+      "speed_kept_per_bounce": 0.6941,
+      "playback": "slow-motion",
+      "upside_down": false,
+      "verdicts": [
+        {
+          "id": "peak",
+          "actual": 20.82,
+          "hit": true,
+          "error": 0.05999999999999872
+        },
+        {
+          "id": "landing",
+          "actual": 4.899,
+          "hit": true,
+          "error": 0.005300000000000082
+        }
+      ],
+      "tracker": "sam-3.1",
+      "explanation": "Gravity measures just 2.48 m/s\u00b2 against 9.81 m/s\u00b2 remembered \u2014 so either the clip is slowed about 1.99 times or this isn't Earth gravity! Harder slams lose more speed \u2014 just 62.1% kept at 3.23 m/s versus 69.41% at 2 m/s \u2014 and the speed-aware model nailed the next peak: 20.76 cm predicted, 20.82 cm actual!",
+      "_seconds": 35.4
+    },
+    "physlens_score": {
+      "g_rel_err": 0.009676730243923362,
+      "g_ok": true,
+      "playback_ok": true,
+      "upside_ok": true
+    }
+  },
+  "sped up 2\u00d7": {
+    "truth": {
+      "g": 39.24,
+      "playback": "sped-up",
+      "upside_down": false
+    },
+    "muse_spark": {
+      "gravity_m_s2": 9.8,
+      "speed_kept_per_bounce": 0.8,
+      "playback": "real-time",
+      "upside_down": false,
+      "reasoning": "fall accelerates down at ~9.8 and bounces decay normally",
+      "_seconds": 14.2
+    },
+    "muse_spark_score": {
+      "g_rel_err": 0.7502548419979612,
+      "g_ok": false,
+      "playback_ok": false,
+      "upside_ok": true
+    },
+    "physlens": {
+      "gravity_m_s2": 39.500613846570204,
+      "g_err": 0.8240133098262657,
+      "speed_kept_per_bounce": 0.6931,
+      "playback": "sped-up",
+      "upside_down": false,
+      "verdicts": [
+        {
+          "id": "peak",
+          "actual": 20.47,
+          "hit": true,
+          "error": -0.10000000000000142
+        },
+        {
+          "id": "landing",
+          "actual": 1.2478,
+          "hit": true,
+          "error": 0.0051000000000001044
+        }
+      ],
+      "tracker": "sam-3.1",
+      "explanation": "We measured gravity at 39.5 m/s\u00b2 versus 9.81 m/s\u00b2, so either this clip is sped up or this isn't Earth's gravity. The bounce got livelier as it slowed, keeping 62.04% of its speed at 12.9 m/s and 69.31% of its speed at 7.97 m/s, nailing the next peak at 20.57 cm versus 20.47 cm seen.",
+      "_seconds": 36.3
+    },
+    "physlens_score": {
+      "g_rel_err": 0.006641535335632051,
+      "g_ok": true,
+      "playback_ok": true,
+      "upside_ok": true
+    }
+  },
+  "reversed": {
+    "truth": {
+      "g": 9.81,
+      "playback": "reversed",
+      "upside_down": false
+    },
+    "muse_spark": {
+      "gravity_m_s2": 0.59,
+      "speed_kept_per_bounce": 0.75,
+      "playback": "slow-motion",
+      "upside_down": false,
+      "reasoning": "1m tape fall takes ~1.84s vs 0.45s expected, g~0.6 ~9.8/16 =4x slow-mo, bounce heights decay",
+      "_seconds": 21.9
+    },
+    "muse_spark_score": {
+      "g_rel_err": 0.9398572884811417,
+      "g_ok": false,
+      "playback_ok": false,
+      "upside_ok": true
+    },
+    "physlens": {
+      "gravity_m_s2": 9.67672649520898,
+      "g_err": 0.23189187760671762,
+      "speed_kept_per_bounce": 1.3687,
+      "playback": "reversed",
+      "upside_down": false,
+      "verdicts": [],
+      "tracker": "sam-3.1",
+      "explanation": "This clip is playing backwards \u2014 the ball blasts off 37.47% faster than it arrived! It keeps 137.47% of its speed, impossible for a real bounce, so no prediction was made.",
+      "_seconds": 37.6
+    },
+    "physlens_score": {
+      "g_rel_err": 0.013585474494497504,
+      "g_ok": true,
+      "playback_ok": true,
+      "upside_ok": true
+    }
+  },
+  "upside down": {
+    "truth": {
+      "g": 9.81,
+      "playback": "real-time",
+      "upside_down": true
+    },
+    "muse_spark": {
+      "gravity_m_s2": 9.8,
+      "speed_kept_per_bounce": 0.8,
+      "playback": "real-time",
+      "upside_down": true,
+      "reasoning": "floor at top man inverted ball accelerates up-frame at ~9.8 with decreasing bounces in real time",
+      "_seconds": 27.3
+    },
+    "muse_spark_score": {
+      "g_rel_err": 0.0010193679918450342,
+      "g_ok": true,
+      "playback_ok": true,
+      "upside_ok": true
+    },
+    "physlens": {
+      "gravity_m_s2": 9.806334224039864,
+      "g_err": 0.19132538010563666,
+      "speed_kept_per_bounce": 0.6921,
+      "playback": "real-time",
+      "upside_down": true,
+      "verdicts": [
+        {
+          "id": "peak",
+          "actual": 20.2,
+          "hit": true,
+          "error": -0.10999999999999943
+        },
+        {
+          "id": "landing",
+          "actual": 2.4513,
+          "hit": true,
+          "error": 0.008000000000000007
+        }
+      ],
+      "tracker": "sam-3.1",
+      "explanation": "This view is upside-down \u2014 gravity pulls up on screen at 9.81 m/s\u00b2! The ball kept 61.91% of its speed at 6.4 m/s but 69.21% at 3.96 m/s, nailing the next peak at 20.31 cm predicted vs 20.2 cm seen.",
+      "_seconds": 33.6
+    },
+    "physlens_score": {
+      "g_rel_err": 0.00037367746790385736,
+      "g_ok": true,
+      "playback_ok": true,
+      "upside_ok": true
+    }
+  },
+  "12 fps": {
+    "truth": {
+      "g": 9.81,
+      "playback": "real-time",
+      "upside_down": false
+    },
+    "muse_spark": {
+      "gravity_m_s2": 9.8,
+      "speed_kept_per_bounce": 0.75,
+      "playback": "real-time",
+      "upside_down": false,
+      "reasoning": "Ball falls down ~1m tape in ~0.45s matching 9.8, each rebound lower so speed kept <1, orientation normal and timing matches real drop",
+      "_seconds": 19.2
+    },
+    "muse_spark_score": {
+      "g_rel_err": 0.0010193679918450342,
+      "g_ok": true,
+      "playback_ok": true,
+      "upside_ok": true
+    },
+    "physlens": {
+      "gravity_m_s2": 10.332152838677752,
+      "g_err": 0.19080990971481207,
+      "speed_kept_per_bounce": 0.7,
+      "playback": "real-time",
+      "upside_down": false,
+      "verdicts": [],
+      "tracker": "sam-3.1",
+      "explanation": "The ball keeps 70% of its speed through the bounce after slamming in at 4.16 m/s, predicting a 20.12 cm next peak. Gravity clocks in at 10.33 m/s\u00b2 with 0.19 m/s\u00b2 uncertainty, right in line with 9.81 m/s\u00b2.",
+      "_seconds": 25.5
+    },
+    "physlens_score": {
+      "g_rel_err": 0.053226589059913496,
+      "g_ok": true,
+      "playback_ok": true,
+      "upside_ok": true
+    }
+  },
+  "Mars gravity": {
+    "truth": {
+      "g": 3.71,
+      "upside_down": false
+    },
+    "muse_spark": {
+      "gravity_m_s2": 0.6,
+      "speed_kept_per_bounce": 0,
+      "playback": "slow-motion",
+      "upside_down": false,
+      "reasoning": "~2m fall takes ~2.7s => ~0.6m/s2 <<9.8 so slow-motion; ball stops on floor so e~0; floor at bottom so not upside-down",
+      "_seconds": 20.0
+    },
+    "muse_spark_score": {
+      "g_rel_err": 0.8382749326145552,
+      "g_ok": false,
+      "upside_ok": true
+    },
+    "physlens": {
+      "gravity_m_s2": 3.703560116613547,
+      "g_err": 0.03703587488838163,
+      "speed_kept_per_bounce": 0.7501,
+      "playback": "slow-motion",
+      "upside_down": false,
+      "verdicts": [
+        {
+          "id": "peak",
+          "actual": 17.77,
+          "hit": true,
+          "error": 0.0
+        },
+        {
+          "id": "landing",
+          "actual": 3.2811,
+          "hit": true,
+          "error": -0.00010000000000021103
+        }
+      ],
+      "tracker": "sam-3.1",
+      "explanation": "Gravity measures only 3.7 m/s\u00b2 against 9.81 m/s\u00b2 textbook, so either the clip is running about 1.63 times slow or this isn't Earth's gravity. The ball keeps about 75.01% of its speed through the bounce and hits the predicted 17.77 cm peak dead on!",
+      "_seconds": 77.3
+    },
+    "physlens_score": {
+      "g_rel_err": 0.0017358176243809117,
+      "g_ok": true,
+      "upside_ok": true
+    }
+  },
+  "bouncy twin": {
+    "truth": {
+      "g": 9.81,
+      "e": 0.85,
+      "playback": "real-time",
+      "upside_down": false
+    },
+    "muse_spark": {
+      "gravity_m_s2": 0.4,
+      "speed_kept_per_bounce": 0.8,
+      "playback": "slow-motion",
+      "upside_down": false,
+      "reasoning": "Fall ~2m takes ~3.3s so apparent a~0.4 <<9.8 => slow-motion, motion is downwards to bottom line => not upside-down, bounce peak lower => restitution <1",
+      "_seconds": 102.5
+    },
+    "muse_spark_score": {
+      "g_rel_err": 0.9592252803261977,
+      "g_ok": false,
+      "e_ok": true,
+      "playback_ok": false,
+      "upside_ok": true
+    },
+    "physlens": {
+      "gravity_m_s2": 9.789455840369081,
+      "g_err": 0.09789540714403384,
+      "speed_kept_per_bounce": 0.85,
+      "playback": "real-time",
+      "upside_down": false,
+      "verdicts": [
+        {
+          "id": "peak",
+          "actual": 37.64,
+          "hit": true,
+          "error": 0.0
+        },
+        {
+          "id": "landing",
+          "actual": 2.4262,
+          "hit": true,
+          "error": 0.0
+        }
+      ],
+      "tracker": "sam-3.1",
+      "explanation": "We called the next bounce at 37.64 cm and it hit 37.64 cm \u2014 dead on! The ball keeps 85% of its speed each bounce while falling at 9.79 m/s\u00b2.",
+      "_seconds": 66.9
+    },
+    "physlens_score": {
+      "g_rel_err": 0.002094205874711444,
+      "g_ok": true,
+      "e_ok": true,
+      "playback_ok": true,
+      "upside_ok": true
+    }
+  },
+  "dead twin": {
+    "truth": {
+      "g": 9.81,
+      "e": 0.55,
+      "playback": "real-time",
+      "upside_down": false
+    },
+    "muse_spark": {
+      "gravity_m_s2": 9.8,
+      "speed_kept_per_bounce": 0.3,
+      "playback": "real-time",
+      "upside_down": false,
+      "reasoning": "fall of ~2m in ~0.6s matches 9.8, very low rebound, floor at bottom, forward downward motion",
+      "_seconds": 36.2
+    },
+    "muse_spark_score": {
+      "g_rel_err": 0.0010193679918450342,
+      "g_ok": true,
+      "e_ok": false,
+      "playback_ok": true,
+      "upside_ok": true
+    },
+    "physlens": {
+      "gravity_m_s2": 9.791972789292082,
+      "g_err": 0.09792536931036525,
+      "speed_kept_per_bounce": 0.5501,
+      "playback": "real-time",
+      "upside_down": false,
+      "verdicts": [
+        {
+          "id": "peak",
+          "actual": 9.13,
+          "hit": true,
+          "error": -0.009999999999999787
+        },
+        {
+          "id": "landing",
+          "actual": 1.2214,
+          "hit": true,
+          "error": 0.0
+        }
+      ],
+      "tracker": "sam-3.1",
+      "explanation": "We called the next bounce at 9.14 cm and it hit 9.13 cm \u2014 almost perfect! The ball kept 55% of its speed, with gravity at 9.79 m/s\u00b2 in real time.",
+      "_seconds": 45.0
+    },
+    "physlens_score": {
+      "g_rel_err": 0.001837636157789876,
+      "g_ok": true,
+      "e_ok": true,
+      "playback_ok": true,
+      "upside_ok": true
+    }
+  },
+  "_budget": {
+    "spent_usd": 1.3198,
+    "cap_usd": 50.0,
+    "calls": 5,
+    "by_model": {
+      "estimate-before-meter": 1.25,
+      "muse-spark-1.3": 0.0418,
+      "sam-3.1": 0.028
+    }
+  }
+}

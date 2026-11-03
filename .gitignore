@@ -1,0 +1,22 @@
+backend/.venv/
+**/__pycache__/
+.pytest_cache/
+web/node_modules/
+web/dist/
+media/
+replays/*.jsonl
+.DS_Store
+
+# API keys stay on this machine
+.env
+**/.env
+backend/.spend.jsonl
+
+# Secrets and caches
+gpu_worker/.env
+
+# Large or regenerable data (see each folder's SOURCE.md to fetch again)
+datasets/
+records/
+benchmark/cache/
+.claude/
