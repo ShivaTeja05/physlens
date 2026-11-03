@@ -4,7 +4,7 @@
     "experiment": "drop"
   },
   "drop-slowmo-2x": {
-    "label": "Slow-mo 2×",
+    "label": "Slow-mo 2\u00d7",
     "experiment": "drop"
   },
   "drop-low-gravity": {
@@ -14,7 +14,7 @@
   "real-classroom-drop": {
     "label": "Real classroom drop",
     "px_per_m": 161.143,
-    "credit": "Video: Loo Kang Wee, ComPADRE · CC BY 3.0",
+    "credit": "Video: Loo Kang Wee, ComPADRE \u00b7 CC BY 3.0",
     "experiment": "drop"
   },
   "cup-catch": {
@@ -32,5 +32,18 @@
       "true_mass_g": 250
     },
     "credit": "Kitchen-scale reading for this clip: 250 g"
+  },
+  "crash-frontal": {
+    "label": "Real crash test (frontal)",
+    "experiment": "crash",
+    "params": {
+      "car_length_m": 4.63,
+      "mass_kg": 2007,
+      "official_kmh": 56.55,
+      "sensor_crush_m": 0.71,
+      "sensor_decel_g": 21.7,
+      "sensor_rebound_ms": 1.7
+    },
+    "credit": "Video: NHTSA crash test 9070 (2015 Lexus NX 200t), camera 15"
   }
 }

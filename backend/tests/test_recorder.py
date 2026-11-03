@@ -3,7 +3,7 @@ from pathlib import Path
 
 import pytest
 
-from physlens import recorder
+from physlens import recorder, replay
 from physlens.events import EventLog
 from physlens.experiments import CARDS
 from physlens.ledger import Ledger
@@ -36,6 +36,24 @@ def test_record_has_the_physics(drop_record):
     assert rec["predictions"] and all(p["sha256"] for p in rec["predictions"])
     kinds = [e["kind"] for e in rec["events"]]
     assert kinds[0] == "start" and kinds[-1] == "end" and "peak" in kinds
+
+
+def test_replay_reproduces_reality(drop_record):
+    _, rec, _ = drop_record
+    out = replay.what_if(rec, "ball")
+    assert out["rms_m"] < 0.02                       # within 2 cm over the whole clip
+    for real, sim in zip(out["observed_peaks"][:3], out["replay"]["peaks"][:3]):
+        assert abs(real["height_m"] - sim["height_m"]) < 0.03 and abs(real["t"] - sim["t"]) < 0.04
+
+
+def test_what_if_changes_the_outcome(drop_record):
+    _, rec, _ = drop_record
+    bouncier = replay.what_if(rec, "ball", restitution=0.9)
+    base, alt = bouncier["replay"]["peaks"], bouncier["what_if"]["peaks"]
+    assert alt[0]["height_m"] > base[0]["height_m"] * 1.2
+    moon = replay.what_if(rec, "ball", gravity=1.62)
+    assert moon["what_if"]["peaks"][0]["t"] > base[0]["t"] * 1.5      # same bounce, much slower under Moon gravity
+    assert any("instead of" in line for line in moon["summary"])
 
 
 def test_list_and_rewrite(drop_record):

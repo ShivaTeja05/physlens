@@ -1,9 +1,9 @@
 # PhysLens Lab: prototype v0
 
-> **Versions.** This branch (`main`, tag `v1.0-normal`) is the core PhysLens Lab: stage experiments, law discovery,
-> Scan mode, voice Q&A, trajectory lines and saved records. The simulator work (what-if replays, crash
-> reconstruction, the 3D world with Rapier and MuJoCo, moving-camera physics, 3D point worlds of real footage) lives on
-> the `simulator` branch (tag `v2.0-simulator`).
+> **Versions.** This branch (`simulator`, tag `v2.0-simulator`) has everything: the core Lab (also on `main`, tag
+> `v1.0-normal`) plus the simulator work: what-if replays, crash reconstruction from NHTSA crash tests, the 3D world
+> (Rapier) and MuJoCo fits, physics from a moving camera, and 3D point worlds of real footage
+> (`benchmark/MOVING_CAMERA.md`, `benchmark/REAL_VEHICLES.md`).
 
 A working vertical slice of the architecture in [../architecture.md](../architecture.md), built around **drop & bounce** plus three stage experiments (*Catch the cup*, *Mystery Cans*, *Weigh it by watching*). You upload a clip (or pick a test clip), the engine tracks the ball, measures gravity and bounciness with error bars, locks predictions for the next bounce using only earlier frames, checks them, and explains the result. The stage display plays it all back in sync with the video, keynote style.
 
@@ -93,7 +93,7 @@ and markers at each bounce (◆) and peak (▲) with their times. **Path** in th
 *whole run* and *off*. In Scan photos, motion can only be inferred: where Muse Spark says something is moving
 toward something, the scan draws the arc a thrown object follows and labels it "likely path, inferred".
 
-## Records
+## Records: replay and what-if
 Every run is written to a **black-box record** in `records/physlens.db` (SQLite, one file; `physlens/recorder.py`).
 Old runs are imported from `replays/`:
 
@@ -110,7 +110,69 @@ Contacts are found between frames: the falling and rising arcs either side are f
 contact is where they meet, with the speed into and out of it. On the rendered drop that recovers the true
 bounciness 0.78 at every bounce; on the real classroom clip, 0.62 → 0.69 → 0.72 → 0.75 as impacts get gentler.
 
-The **Records** card reopens any past run. `GET /api/records`, `GET /api/records/{id}`.
+**Replay & what-if** (`physlens/replay.py`, Lab sidebar): a record is re-simulated from its stored start state with
+the law found for it and each bounce's measured bounciness, then compared with what happened. The replay follows
+the real classroom drop to within **1.9 cm** RMS, and the rendered drop to within 0.5 cm. Change gravity,
+bounciness, launch speed or drag, and the what-if path is drawn over the real video next to the replay, with a plain
+summary ("Peak 1: 94 cm at 2.26 s instead of 82 cm at 1.08 s"). The **Records** card reopens any past run.
+`GET /api/records`, `GET /api/records/{id}`, `POST /api/records/{id}/whatif`. Supported so far: vertical motion
+(drops, bounces, flights, springs).
+
+## Crash reconstruction (real crash-test footage)
+Sample **Real crash test (frontal)**: NHTSA test 9070, a 2015 Lexus NX 200t driven into a rigid barrier, filmed by a
+fixed real-time side camera (30 fps); footage and sensor data from NHTSA's public Vehicle Crash Test Database
+(`datasets/nhtsa/`, `SOURCE.md`). `physlens/labs/crash.py`:
+- **Edges, not centre:** a background-subtraction box tracker (`perception/box_tracker.py`; free, frame-exact) gives the car's front and rear edges in every frame.
+- **The approach calibrates the camera:** the car coasts at constant speed and is rigid. Its known length (4.63 m) gives the scale, and a perspective correction is tested and kept only if it clearly helps (here it doesn't).
+- **The speed is locked before impact,** with an error bar that includes a ±2% edge-definition systematic.
+- **Then impact, crush, deceleration and rebound,** with key moments saved to the recorder and an animated to-scale reconstruction under the video.
+- **What-if:** "same car at another speed", from a labelled spring model of the car's front.
+
+| | From the 30 fps video | NHTSA's own measurement |
+|---|---|---|
+| Impact speed | **57.7 km/h (90%: 56.3–59.1)** | 56.55 km/h, inside the band ✓ |
+| Law of the approach | a = 0 (coasting, no force) | released before the barrier |
+| Max crush | at least 0.53 m | 0.71 m (rear-floorpan accelerometers, integrated) |
+| Average deceleration | about 17 g | 21.7 g (peak 57–59 g at 38 ms) |
+| Rebound | about 2.5 m/s (the crushed front springs back) | 1.6–1.7 m/s |
+
+Speed from video is solid. Crush and deceleration from 30 fps are coarse, because the crush lasts about 74 ms (2–3
+frames). The test's 1,000 fps high-speed cameras would resolve them. Next: those cameras, two-body impacts (the
+side test 9001, where momentum is checkable), and dashcam footage, which has no ground truth.
+
+## Atomic scenes and the 3D world
+Every record exports as an **atomic scene** (`physlens/scene.py`, `GET /api/records/{id}/scene`, format
+`physlens-scene/1`):
+- **World:** gravity (measured when a law was found), the ground, and fixed obstacles such as a crash barrier.
+- **Objects:** shape, size, mass, bounciness, friction and post-impact drag, each with its source (measured / given / assumed).
+- **Atoms:** one object at one instant: position, velocity, orientation, ± error, and which fields were measured. One camera sees no depth, so z and orientation are always marked assumed.
+- **Moments:** contacts, impacts, crush.
+
+**3D world** (Lab → *3D world*, three.js + react-three-fiber + Rapier):
+- **Solid:** the measured atoms, replayed exactly. A car box shortens with its measured crush.
+- **Magenta ghost:** Rapier re-simulating from the first atom with the measured parameters. Sliders change gravity, bounciness and speed.
+- **Drift readout:** how far physics alone departs from reality.
+
+On the real classroom drop the re-simulation stays within 7.4 cm RMS, using each bounce's measured bounciness. On
+the NHTSA crash it stays within 28 cm, using the measured restitution and post-impact drag. The remaining gap there is
+the crush, which rigid bodies can't model, and the panel says so.
+
+## MuJoCo, fitted to the record (system identification)
+**Fit MuJoCo** in the 3D world (`physlens/sim_mujoco.py`, `POST /api/records/{id}/mujoco`) exports the atomic
+scene as a MuJoCo model (MJCF) and fits its unknown physics until the simulation reproduces the measured atoms. The
+fitted model downloads as MJCF (`/api/records/{id}/mujoco.xml`), with the measured start as a keyframe, so the event
+replays in any MuJoCo viewer.
+
+| Record | Fitted | Simulation vs measured atoms |
+|---|---|---|
+| Rendered drop (bounciness 0.78) | bounciness ≈ 0.765 (gravity held at the measured 9.81) | **1.1 cm** RMS (3.8 unfitted) |
+| Real classroom drop | speed-dependent bounciness e0 − e1·v (gravity held at the measured 9.73) | **6.8 cm** RMS (26.6 unfitted) |
+| NHTSA frontal crash | crumple zone as MuJoCo's soft contact: crush 0.60 m (accelerometer 0.71), restitution 0.15, impact 58.7 km/h (official 56.55), drag after rebound | **10.3 cm** RMS (529.5 unfitted) |
+
+Lessons from building it:
+- **Bouncy contacts:** MuJoCo's default soft contact pumps energy into bouncy collisions (a target bounciness of 0.9 came back as 20). The direct spring-damper form keeps it within a few percent.
+- **Gravity stays at the engine's measurement:** a whole-clip fit bends it to absorb contact details. Fitted freely, it drifted to 11.5 m/s².
+- **The optimiser:** a derivative-free optimiser (Powell) works where finite-difference gradients stall on a stepped simulation.
 
 ## Speed
 A real classroom run went from about 3 minutes to **24 s**:

@@ -3,9 +3,13 @@ import { createRun, getExperiments, getHealth, getRecordEvents, getRecords, getS
 import { cursor, deriveState, objectPaths, timeline } from './derive'
 import { drawOverlay, type PathMode, type SimOverlay } from './overlay'
 import { DiscoveredLaws, Explanation, HypothesisRaces, Measurements, MemoryVsEyes, Predictions, Readout, Scoreboard } from './panels'
-import type { NarrationEvent, PhysEvent, RunStateEvent, VerdictEvent, VideoInfo } from './types'
+import type { NarrationEvent, PhysEvent, ReconstructionEvent, RunStateEvent, VerdictEvent, VideoInfo } from './types'
 import AskBar from './AskBar'
+import ReconstructionPanel from './ReconstructionPanel'
+import World3D from './World3D'
+import WhatIfPanel from './WhatIfPanel'
 import ScanView from './ScanView'
+import PointWorld from './PointWorld'
 import './App.css'
 
 type Status = 'idle' | 'analysing' | 'ready' | 'error'
@@ -45,7 +49,7 @@ export default function App() {
   const [uploadExp, setUploadExp] = useState('drop')
   const [uploadParams, setUploadParams] = useState<Record<string, string>>({})
   const [runExp, setRunExp] = useState('drop')
-  const [mode, setMode] = useState<'lab' | 'scan'>('lab')
+  const [mode, setMode] = useState<'lab' | 'scan' | 'points'>('lab')
   const [activeSample, setActiveSample] = useState<string>()
 
   const videoRef = useRef<HTMLVideoElement>(null)
@@ -59,13 +63,15 @@ export default function App() {
 
   const tl = useMemo(() => timeline(events), [events])
   const paths = useMemo(() => objectPaths(tl), [tl])
+  const recon = useMemo(() => tl.find((e) => e.type === 'reconstruction') as ReconstructionEvent | undefined, [tl])
   const pathsRef = useRef(paths)
   pathsRef.current = paths
   const [pathMode, setPathMode] = useState<PathMode>('sofar')
-  const [sims] = useState<SimOverlay[]>([])
+  const [sims, setSims] = useState<SimOverlay[]>([])
   const simsRef = useRef(sims)
   simsRef.current = sims
   const [records, setRecords] = useState<RecordRow[]>([])
+  const [show3d, setShow3d] = useState(false)
   const pathModeRef = useRef(pathMode)
   pathModeRef.current = pathMode
   const tlRef = useRef(tl)
@@ -310,6 +316,7 @@ export default function App() {
         <div className="modes">
           <button className={mode === 'lab' ? 'on' : ''} onClick={() => setMode('lab')}>Lab</button>
           <button className={mode === 'scan' ? 'on' : ''} onClick={() => { speechSynthesis.cancel(); videoRef.current?.pause(); setMode('scan') }}>Scan</button>
+          <button className={mode === 'points' ? 'on' : ''} onClick={() => { speechSynthesis.cancel(); videoRef.current?.pause(); setMode('points') }}>3D points</button>
         </div>
         <div className="sources" style={mode !== 'lab' ? { display: 'none' } : undefined}>
           {[['Drop & bounce', samples.filter((s) => (s.experiment ?? 'drop') === 'drop')],
@@ -386,7 +393,7 @@ export default function App() {
         </div>
       </header>
 
-      {mode === 'scan' ? <ScanView voice={voice} onFilm={(x) => { chooseUploadExp(x); setMode('lab') }} /> : (
+      {mode === 'points' ? <PointWorld /> : mode === 'scan' ? <ScanView voice={voice} onFilm={(x) => { chooseUploadExp(x); setMode('lab') }} /> : (
       <main>
         <div className="stage-col">
           <div className="stage" ref={stageRef}>
@@ -439,11 +446,14 @@ export default function App() {
               ))}
             </div>
             <span className="clock">{time.toFixed(3)} s</span>
+            <button className={`toggle ${show3d ? 'on' : ''}`} title="Re-simulate the recorded atoms in a 3D world" onClick={() => setShow3d(!show3d)}>3D world</button>
             <button className="toggle" title="Trajectory lines: what happened"
               onClick={() => setPathMode(pathMode === 'sofar' ? 'whole' : pathMode === 'whole' ? 'off' : 'sofar')}>
               Path: {pathMode === 'sofar' ? 'so far' : pathMode === 'whole' ? 'whole run' : 'off'}
             </button>
           </div>
+          {recon && status === 'ready' && <ReconstructionPanel recon={recon} time={time} />}
+          {status === 'ready' && runId && show3d && <World3D runId={runId} time={time} />}
           <AskBar context={status === 'ready' && runId ? `run:${runId}` : null} voice={voice} />
         </div>
 
@@ -454,6 +464,7 @@ export default function App() {
           <Predictions s={state} />
           <HypothesisRaces s={state} />
           <Explanation s={state} />
+          {status === 'ready' && runId && paths[0] && runExp !== 'crash' && <WhatIfPanel runId={runId} object={paths[0].id} onPaths={setSims} />}
           <Scoreboard hits={totals.hits} total={totals.total} />
           {records.length > 0 && (
             <section className="card records">

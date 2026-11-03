@@ -345,6 +345,67 @@ def record(capture_id: str):
         raise HTTPException(404, "unknown record")
 
 
+@app.post("/api/records/{capture_id}/whatif")
+def what_if(capture_id: str, object: str = Form(...), gravity: Optional[float] = Form(None),
+            restitution: Optional[float] = Form(None), speed_factor: float = Form(1.0), drag: Optional[float] = Form(None),
+            horizon: Optional[float] = Form(None)):
+    """Replay a record from its stored state with the law found for it, and the same with one thing changed."""
+    from . import recorder, replay
+    try:
+        rec = recorder.export(capture_id)
+    except KeyError:
+        raise HTTPException(404, "unknown record")
+    try:
+        out = replay.what_if(rec, object, gravity=gravity, restitution=restitution, speed_factor=speed_factor,
+                             drag=drag, horizon=horizon)
+    except replay.Unsupported as exc:
+        raise HTTPException(422, str(exc))
+    out["px_from_m"] = rec["px_from_m"]
+    return out
+
+
+@app.get("/api/records/{capture_id}/scene")
+def record_scene(capture_id: str):
+    """The record as an atomic scene (world, objects, atoms over time, moments) for the 3D world."""
+    from . import scene
+    try:
+        return scene.build(capture_id, REPLAYS)
+    except KeyError:
+        raise HTTPException(404, "unknown record")
+
+
+SIM_DIR = ROOT / "records" / "sim"
+
+
+@app.post("/api/records/{capture_id}/mujoco")
+async def record_mujoco(capture_id: str):
+    """Fit a MuJoCo simulation to the record's atoms (system identification); saves the fitted MJCF model."""
+    from . import scene, sim_mujoco
+    try:
+        sc = scene.build(capture_id, REPLAYS)
+    except KeyError:
+        raise HTTPException(404, "unknown record")
+    if not sc["objects"]:
+        raise HTTPException(422, "this record has no objects to simulate")
+    out = await asyncio.to_thread(sim_mujoco.fit, sc)
+    SIM_DIR.mkdir(parents=True, exist_ok=True)
+    name = Path(capture_id).name
+    (SIM_DIR / f"{name}.xml").write_text(out["mjcf"])
+    (SIM_DIR / f"{name}.json").write_text(json.dumps({k: v for k, v in out.items() if k != "track"}, default=float))
+    return json.loads(json.dumps(out, default=float))
+
+
+@app.get("/api/records/{capture_id}/mujoco.xml")
+def record_mujoco_xml(capture_id: str):
+    """The fitted MuJoCo model (MJCF), to open in any MuJoCo viewer."""
+    from fastapi.responses import PlainTextResponse
+    f = SIM_DIR / f"{Path(capture_id).name}.xml"
+    if not f.exists():
+        raise HTTPException(404, "fit the record first")
+    return PlainTextResponse(f.read_text(), media_type="application/xml",
+                             headers={"Content-Disposition": f'attachment; filename="{f.name}"'})
+
+
 @app.get("/api/records/{capture_id}/events")
 def record_events(capture_id: str):
     """A past run's full event stream, so the app can open it again."""
