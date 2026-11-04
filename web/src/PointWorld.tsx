@@ -196,6 +196,32 @@ function ViewSetter({ header, controls, view }: { header: Header; controls: Reac
 
 const KIND_ICON: Record<string, string> = { cruise: '→', braking: '⏷', contact: '✸', impact: '✸', crush: '▣', stop: '■', rebound: '↩', peak_speed: '→' }
 
+// The simulator's body (benchmark/simulate_worlds.py): one body of real points in its own coordinates (groups 254:
+// real colours, 253: coloured by how many frames saw each spot) and a pose per frame while it is rigid.
+type Pose = { frame: number; t: number; used: boolean; x?: number; y?: number; z?: number; yaw?: number; rms?: number }
+type Face = { covered_pct: number; area_m2: number; most_frames_on_a_spot: number; points: number }
+type BodyNote = {
+  poses: Pose[]; rigid_until_t: number | null; after_rigid: string | null; points: number; frames_used: number; frames: number
+  coverage: { faces: Record<string, Face>; never_seen: string[]; size_m: { length: number; height: number; width: number } }
+  seen_max: number
+}
+const BODY = 254, BODY_HEAT = 253
+
+/** The body's pose at time t: linear between the frames' poses (heading the short way round); null outside them. */
+function poseAt(poses: Pose[], t: number): { x: number; y: number; z: number; yaw: number } | null {
+  const u = poses.filter((p) => p.used)
+  if (!u.length || t < u[0].t - 1e-6 || t > u[u.length - 1].t + 1e-6) return null
+  let i = 0
+  while (i < u.length - 2 && u[i + 1].t < t) i++
+  const a = u[i], b = u[Math.min(i + 1, u.length - 1)]
+  const f = b.t > a.t ? Math.min(Math.max((t - a.t) / (b.t - a.t), 0), 1) : 0
+  let dy = (b.yaw ?? 0) - (a.yaw ?? 0)
+  dy = Math.atan2(Math.sin(dy), Math.cos(dy))
+  return { x: a.x! + f * (b.x! - a.x!), y: a.y! + f * (b.y! - a.y!), z: a.z! + f * (b.z! - a.z!), yaw: a.yaw! + f * dy }
+}
+
+const FACE_NAMES: Record<string, string> = { front: 'Front', rear: 'Rear', left: 'Left side', right: 'Right side', top: 'Top' }
+
 type Props = { base?: string; initial?: string; standalone?: boolean }
 
 export default function PointWorld({ base = '/media/pointworld/', initial, standalone = false }: Props) {
@@ -213,6 +239,10 @@ export default function PointWorld({ base = '/media/pointworld/', initial, stand
   const [answer, setAnswer] = useState<string>()
   const [asking, setAsking] = useState(false)
   const [question, setQuestion] = useState('')
+  const [mode, setMode] = useState<'sim' | 'frames'>('sim')
+  const [colourBy, setColourBy] = useState<'real' | 'seen'>('real')
+  const [tSim, setTSim] = useState(0)
+  const [rate, setRate] = useState(0.5)
   const controls = useRef<any>(null)
 
   useEffect(() => {
@@ -225,32 +255,57 @@ export default function PointWorld({ base = '/media/pointworld/', initial, stand
     if (!name) return
     setLoading(true); setErr(undefined); setData(undefined); setK(0); setPlaying(false); setView('camera'); setAnswer(undefined)
     if (standalone) history.replaceState(null, '', `#${name}`)
-    load(base, name).then((d) => { setData(d); if (d.header.decimated_from) setSize(1.8) }).catch((e) => setErr(String(e))).finally(() => setLoading(false))
+    load(base, name).then((d) => {
+      setData(d)
+      if (d.header.decimated_from) setSize(1.8)
+      const objs = d.header.groups.filter((g) => g.tag !== 255 && g.tag < BODY_HEAT)
+      setTSim(objs[0]?.t ?? 0)
+      setMode(d.header.groups.some((g) => g.tag === BODY) ? 'sim' : 'frames')
+    }).catch((e) => setErr(String(e))).finally(() => setLoading(false))
   }, [name, base, standalone])
-  const objectGroups = data ? data.header.groups.filter((g) => g.tag !== 255) : []
+  const objectGroups = data ? data.header.groups.filter((g) => g.tag !== 255 && g.tag < BODY_HEAT) : []
+  const bodyGroup = data?.header.groups.find((g) => g.tag === BODY)
+  const heatGroup = data?.header.groups.find((g) => g.tag === BODY_HEAT)
+  const sim = mode === 'sim' && !!bodyGroup
+  const tFirst = objectGroups[0]?.t ?? 0, tLast = objectGroups[objectGroups.length - 1]?.t ?? 1
   useEffect(() => {
     if (!playing || !objectGroups.length) return
-    const id = setInterval(() => setK((x) => (x + 1) % objectGroups.length), 180)
-    return () => clearInterval(id)
-  }, [playing, objectGroups.length])
+    if (!sim) {
+      const id = setInterval(() => setK((x) => (x + 1) % objectGroups.length), 180)
+      return () => clearInterval(id)
+    }
+    // Simulation: continuous time, at `rate` × real time.
+    let last = performance.now(), raf = 0
+    const tick = (now: number) => {
+      const dt = (now - last) / 1000
+      last = now
+      setTSim((t) => (t + dt * rate > tLast ? tFirst : t + dt * rate))
+      raf = requestAnimationFrame(tick)
+    }
+    raf = requestAnimationFrame(tick)
+    return () => cancelAnimationFrame(raf)
+  }, [playing, objectGroups.length, sim, rate, tFirst, tLast])
 
   const h = data?.header
-  const box = h?.boxes[k]
   const notes = (h?.notes ?? {}) as Record<string, any>
-  const events = (notes.events ?? []) as WorldEvent[]
-  const rigids = (notes.rigid ?? []) as Rigid[]
-  const structures = (notes.structures ?? []) as Structure[]
-  const tNow = objectGroups[k]?.t
-  const frameNow = objectGroups[k]?.frame
-  const rigidNow = rigids.find((r) => r.frame === frameNow)
-  const contactEv = events.find((e) => e.kind === 'contact' || e.kind === 'impact')
-  const hot = !!(contactEv && tNow !== undefined && tNow >= (contactEv.window?.[0] ?? contactEv.t) - 0.02)
-  const tFirst = objectGroups[0]?.t ?? 0, tLast = objectGroups[objectGroups.length - 1]?.t ?? 1
+  const bodyNote = notes.body as BodyNote | undefined
   const indexAt = (t: number) => {
     let best = 0
     objectGroups.forEach((g, i) => { if (Math.abs((g.t ?? 0) - t) < Math.abs((objectGroups[best].t ?? 0) - t)) best = i })
     return best
   }
+  const kNow = sim ? indexAt(tSim) : k
+  const box = h?.boxes[kNow]
+  const pose = sim && bodyNote ? poseAt(bodyNote.poses, tSim) : null
+  const jump = (t: number) => { setPlaying(false); if (sim) setTSim(t); else setK(indexAt(t)) }
+  const events = (notes.events ?? []) as WorldEvent[]
+  const rigids = (notes.rigid ?? []) as Rigid[]
+  const structures = (notes.structures ?? []) as Structure[]
+  const tNow = sim ? tSim : objectGroups[k]?.t
+  const frameNow = objectGroups[kNow]?.frame
+  const rigidNow = rigids.find((r) => r.frame === frameNow)
+  const contactEv = events.find((e) => e.kind === 'contact' || e.kind === 'impact')
+  const hot = !!(contactEv && tNow !== undefined && tNow >= (contactEv.window?.[0] ?? contactEv.t) - 0.02)
   const reached = (e: WorldEvent) => tNow !== undefined && tNow + 1e-3 >= (e.window?.[0] ?? e.t)
   const lastEvent = [...events].reverse().find(reached)
 
@@ -260,7 +315,7 @@ export default function PointWorld({ base = '/media/pointworld/', initial, stand
   if (curve && tNow !== undefined && tNow >= curve.t[0] && tNow <= curve.t[curve.t.length - 1]) {
     const i = curve.t.reduce((best, x, j) => (Math.abs(x - tNow) < Math.abs(curve.t[best] - tNow) ? j : best), 0)
     speed = `${Math.max(curve.kmh[i], 0).toFixed(1)} ± ${curve.err_kmh[i].toFixed(1)}`
-  } else if (notes.speeds_kmh && k > 0 && notes.speeds_kmh[k - 1] !== undefined) speed = `${notes.speeds_kmh[k - 1]}`
+  } else if (notes.speeds_kmh && kNow > 0 && notes.speeds_kmh[kNow - 1] !== undefined) speed = `${notes.speeds_kmh[kNow - 1]}`
 
   async function ask(q: string) {
     if (!name) return
@@ -299,15 +354,34 @@ export default function PointWorld({ base = '/media/pointworld/', initial, stand
           </div>
         )}
         {lastEvent && <div className={`pw-event-now ${lastEvent === contactEv ? 'hot' : ''}`}>{KIND_ICON[lastEvent.kind] ?? '•'} {lastEvent.label}</div>}
+        {sim && !pose && objectGroups.length > 0 && (
+          <div className="pw-mode-note">{bodyNote?.rigid_until_t !== null && bodyNote && tSim > (bodyNote.rigid_until_t ?? 0)
+            ? `Measured points of this moment: the body isn't rigid any more (${bodyNote.after_rigid ?? 'it deforms'})`
+            : 'Measured points of this moment: the body is only partly in view'}</div>
+        )}
         {data && h && (
           <Canvas camera={{ near: 0.05, far: 500 }} gl={{ antialias: false }} style={{ background: '#05070c' }}>
             <ViewSetter header={h} controls={controls} view={view} />
             <OrbitControls ref={controls} makeDefault enableDamping />
             <Cloud data={data} group={h.groups[0]} size={view === 'event' ? Math.max(size - 0.4, 0.5) : size} opacity={view === 'event' ? 0.35 : 1} />
-            {trail && objectGroups.map((g, i) => i !== k && <Cloud key={g.tag} data={data} group={g} size={size} opacity={0.18} />)}
-            {objectGroups[k] && <Cloud data={data} group={objectGroups[k]} size={size + 0.4} />}
-            {box && !(rigid && rigidNow) && <SizeBox box={box} label={h.object} />}
-            {rigid && rigidNow && <RigidBox r={rigidNow} hot={hot} />}
+            {sim ? (
+              <>
+                {pose && bodyGroup && (
+                  <group position={[pose.x, pose.y, pose.z]} rotation={[0, -pose.yaw, 0]}>
+                    <Cloud data={data} group={colourBy === 'seen' && heatGroup ? heatGroup : bodyGroup} size={size + 0.4} />
+                  </group>
+                )}
+                {!pose && objectGroups[kNow] && <Cloud data={data} group={objectGroups[kNow]} size={size + 0.4} />}
+                {trail && bodyNote && <Line points={bodyNote.poses.filter((p) => p.used).map((p) => [p.x!, (p.y ?? 0) + 0.05, p.z!] as [number, number, number])} color="#3ee6ff" lineWidth={1.5} transparent opacity={0.6} />}
+              </>
+            ) : (
+              <>
+                {trail && objectGroups.map((g, i) => i !== k && <Cloud key={g.tag} data={data} group={g} size={size} opacity={0.18} />)}
+                {objectGroups[k] && <Cloud data={data} group={objectGroups[k]} size={size + 0.4} />}
+                {box && !(rigid && rigidNow) && <SizeBox box={box} label={h.object} />}
+                {rigid && rigidNow && <RigidBox r={rigidNow} hot={hot} />}
+              </>
+            )}
             {structures.map((s) => <StructureLine key={s.name} s={s} hot={hot} />)}
             {((notes.cameras ?? []) as Cam[]).map((c) => <CameraMarker key={c.name} c={c} />)}
             <gridHelper args={[60, 60, '#1d3b4f', '#0f1d28']} />
@@ -317,19 +391,31 @@ export default function PointWorld({ base = '/media/pointworld/', initial, stand
       {data && h && (
         <div className="pw-panel">
           <div className="pw-controls">
+            {bodyGroup && (
+              <div className="pw-seg" role="group" aria-label="What to show">
+                <button className={sim ? 'on' : ''} onClick={() => { setPlaying(false); setMode('sim'); setTSim(objectGroups[k]?.t ?? tFirst) }}>Simulation</button>
+                <button className={!sim ? 'on' : ''} onClick={() => { setPlaying(false); setMode('frames'); setK(indexAt(tSim)) }}>Raw frames</button>
+              </div>
+            )}
             <button onClick={() => setPlaying((p) => !p)}>{playing ? 'Pause' : 'Play'}</button>
             <div className="pw-timeline">
-              <input type="range" min={0} max={Math.max(objectGroups.length - 1, 0)} value={k} onChange={(e) => { setPlaying(false); setK(+e.target.value) }} />
+              {sim
+                ? <input type="range" min={tFirst} max={tLast} step={0.001} value={tSim} onChange={(e) => { setPlaying(false); setTSim(+e.target.value) }} />
+                : <input type="range" min={0} max={Math.max(objectGroups.length - 1, 0)} value={k} onChange={(e) => { setPlaying(false); setK(+e.target.value) }} />}
               {events.map((e, i) => {
                 const x = (e.t - tFirst) / Math.max(tLast - tFirst, 1e-6)
                 if (x < -0.02 || x > 1.02) return null
                 return <button key={i} className={`pw-tick ${e.kind}`} style={{ left: `${Math.min(Math.max(x, 0), 1) * 100}%` }} title={e.label}
-                  onClick={() => { setPlaying(false); setK(indexAt(e.t)) }}>{KIND_ICON[e.kind] ?? '•'}</button>
+                  onClick={() => jump(e.t)}>{KIND_ICON[e.kind] ?? '•'}</button>
               })}
             </div>
             <span>t = {tNow?.toFixed(2)} s (frame {frameNow})</span>
-            <label><input type="checkbox" checked={trail} onChange={(e) => setTrail(e.target.checked)} /> trail</label>
-            {rigids.length > 0 && <label><input type="checkbox" checked={rigid} onChange={(e) => setRigid(e.target.checked)} /> whole body</label>}
+            {sim && <label>speed <select value={rate} onChange={(e) => setRate(+e.target.value)}>
+              {[0.1, 0.25, 0.5, 1].map((r) => <option key={r} value={r}>{r === 1 ? 'real time' : `${r}×`}</option>)}</select></label>}
+            {sim && heatGroup && <label>colour <select value={colourBy} onChange={(e) => setColourBy(e.target.value as 'real' | 'seen')}>
+              <option value="real">real colour</option><option value="seen">times seen</option></select></label>}
+            <label><input type="checkbox" checked={trail} onChange={(e) => setTrail(e.target.checked)} /> {sim ? 'path' : 'trail'}</label>
+            {!sim && rigids.length > 0 && <label><input type="checkbox" checked={rigid} onChange={(e) => setRigid(e.target.checked)} /> whole body</label>}
             <label>point size <input type="range" min={0.5} max={3} step={0.1} value={size} onChange={(e) => setSize(+e.target.value)} /></label>
           </div>
           {events.length > 0 && (
@@ -337,13 +423,31 @@ export default function PointWorld({ base = '/media/pointworld/', initial, stand
               <div className="pw-events-title">What happened (found from the 3D points)</div>
               {events.map((e, i) => (
                 <button key={i} className={`pw-ev ${reached(e) ? 'past' : ''} ${e === contactEv ? 'key' : ''}`}
-                  onClick={() => { setPlaying(false); setK(indexAt(e.t)) }}>
+                  onClick={() => jump(e.t)}>
                   <span className="pw-ev-t">{e.t.toFixed(2)} s</span>
                   <span className="pw-ev-l">{KIND_ICON[e.kind] ?? '•'} {e.label}</span>
                   {e.detail && <span className="pw-ev-d">{e.detail}</span>}
                   {e.truth && <span className="pw-ev-truth">{e.truth}</span>}
                 </button>
               ))}
+            </div>
+          )}
+          {bodyNote && (
+            <div className="pw-cover">
+              <div className="pw-events-title">The body, and what the camera never saw</div>
+              <div>One body of <b>{bodyNote.points.toLocaleString()}</b> real points, merged from {bodyNote.frames_used} of {bodyNote.frames} frames
+                (each frame fits it within about {Math.round(100 * Math.max(...bodyNote.poses.filter((p) => p.used && (p.rms ?? 0) > 0).map((p) => p.rms ?? 0), 0))} cm),
+                moving on its measured poses. {bodyNote.coverage.size_m.length.toFixed(2)} m long × {bodyNote.coverage.size_m.width.toFixed(2)} m wide × {bodyNote.coverage.size_m.height.toFixed(2)} m high (its points' extent).</div>
+              <div className="pw-faces">
+                {Object.entries(bodyNote.coverage.faces).map(([f, v]) => (
+                  <div key={f} className={`pw-face ${bodyNote.coverage.never_seen.includes(f) ? 'none' : ''}`}>
+                    <span>{FACE_NAMES[f] ?? f}</span>
+                    <span className="pw-bar-track"><span style={{ width: `${Math.min(v.covered_pct, 100)}%` }} /></span>
+                    <span className="pw-face-pct">{v.covered_pct.toFixed(0)}%</span>
+                  </div>
+                ))}
+              </div>
+              {bodyNote.coverage.never_seen.length > 0 && <div className="pw-note">Never seen by the camera: {bodyNote.coverage.never_seen.map((f) => (FACE_NAMES[f] ?? f).toLowerCase()).join(', ')}. Those sides stay empty: nothing is filled in. "Times seen" colours each spot by how many frames measured it.</div>}
             </div>
           )}
           {(notes.explanation || !standalone) && (

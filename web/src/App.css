@@ -371,3 +371,17 @@ header { padding-top: 12px; padding-bottom: 12px; }
 .pw-brand { color: var(--muted); font-size: 14px; }
 .pw-brand b { color: var(--accent); }
 @media (max-width: 640px) { .pw-event-now { max-width: 90%; font-size: 12px; } .pw-standalone .pw-stage { height: 56vh; } }
+.pw-seg { display: inline-flex; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+.pw-seg button { background: transparent; border: 0; border-radius: 0; color: var(--muted); padding: 5px 10px; }
+.pw-seg button.on { background: rgba(62, 230, 255, 0.14); color: var(--accent); }
+.pw-controls select { background: #070b12; color: var(--text); border: 1px solid var(--line); border-radius: 6px; padding: 2px 4px; }
+.pw-mode-note { position: absolute; left: 10px; bottom: 10px; z-index: 2; background: rgba(5, 12, 20, 0.85); border: 1px solid var(--line);
+  color: var(--muted); border-radius: 10px; padding: 5px 9px; font-size: 12.5px; max-width: 70%; }
+.pw-cover { display: grid; gap: 6px; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 10px 14px; font-size: 13.5px; }
+.pw-faces { display: grid; gap: 4px; max-width: 460px; }
+.pw-face { display: grid; grid-template-columns: 90px 1fr 44px; align-items: center; gap: 8px; font-size: 13px; }
+.pw-face .pw-bar-track { height: 7px; background: #0b1622; border-radius: 4px; overflow: hidden; }
+.pw-face .pw-bar-track span { display: block; height: 100%; background: var(--accent); }
+.pw-face.none { color: #ffb347; }
+.pw-face.none .pw-bar-track span { background: #ffb347; }
+.pw-face-pct { text-align: right; font-variant-numeric: tabular-nums; }

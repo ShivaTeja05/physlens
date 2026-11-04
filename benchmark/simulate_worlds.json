@@ -1,0 +1,70 @@
+{
+ "truck-sharp": {
+  "rigid_frames": [
+   116,
+   196
+  ],
+  "rigid_until_t": 6.5399,
+  "after_rigid": "the roof is torn open at the beam",
+  "points": 230647,
+  "frames_used": 21,
+  "frames": 21,
+  "passes": [
+   {
+    "pass": 1,
+    "frames_used": 21,
+    "points": 228733
+   },
+   {
+    "pass": 2,
+    "frames_used": 21,
+    "points": 228169,
+    "largest_move_m": 0.0088
+   }
+  ],
+  "coverage": {
+   "faces": {
+    "front": {
+     "covered_pct": 4.1,
+     "area_m2": 0.18,
+     "most_frames_on_a_spot": 5,
+     "points": 2042
+    },
+    "rear": {
+     "covered_pct": 100.0,
+     "area_m2": 4.42,
+     "most_frames_on_a_spot": 11,
+     "points": 41655
+    },
+    "left": {
+     "covered_pct": 98.4,
+     "area_m2": 22.0,
+     "most_frames_on_a_spot": 18,
+     "points": 80784
+    },
+    "right": {
+     "covered_pct": 10.1,
+     "area_m2": 2.26,
+     "most_frames_on_a_spot": 10,
+     "points": 14452
+    },
+    "top": {
+     "covered_pct": 97.1,
+     "area_m2": 14.19,
+     "most_frames_on_a_spot": 7,
+     "points": 41500
+    }
+   },
+   "never_seen": [
+    "front"
+   ],
+   "size_m": {
+    "length": 9.143,
+    "height": 3.079,
+    "width": 2.258
+   }
+  },
+  "seen_max": 18,
+  "seen_median": 1.0
+ }
+}
