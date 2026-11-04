@@ -35,6 +35,14 @@ All footage is public (NHTSA, NASA, Wikimedia Commons; see each `datasets/*/SOUR
   analogue TV; neither SAM 3.1 nor frame differencing finds them.
 - **Merging two cameras through AI depth** (9070 left + right, and the edited web video mistaken for a camera).
 
+- **Lens from rigidity** (`hybrid.lens_from_rigidity`: a body must keep its size on the floor plane as it crosses
+  the picture; lens and floor tilt fitted together). On 8555, where the answers are known, it chose k1 +0.10 and
+  moved the approach to 64.9 km/h (69.1) and the Jeep to 51.2 (47.9), worse than the floor lines' 69.13 / 48.5:
+  bodies pitch and bounce during a crash, which changes their size in the picture too. Not used.
+- **Yaris (7371) scale and lens**: MoGe-3's points of the struck car give widths of 1.45–1.78 m depending on the
+  part and a length 9% short of its width scale; its field of view changes 71–78° between frames; the floor's seams
+  give k1 −0.40 to +0.34 line by line. Neither the scale nor the lens can be pinned from this footage yet.
+
 ## What made the hybrid work
 - **Lens from straight floor lines** when the motion covers only part of the picture (8555: the physics fit sat at
   its search edge); **each feature at its own height** when a tracked part spans several (a cab's roof and hood),

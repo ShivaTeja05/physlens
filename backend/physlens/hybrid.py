@@ -319,3 +319,80 @@ def track_rigid(gray: list[np.ndarray], region0: np.ndarray, frames: list[int], 
     pad = len(frames) - len(out_th)
     return {"theta": np.r_[out_th, [np.nan] * pad], "t": np.r_[np.array(out_t), np.full((pad, 2), np.nan)],
             "features": np.r_[used, [0] * pad]}
+
+
+def feature_chains(gray: list[np.ndarray], mask: np.ndarray, i: int, j: int, max_pts: int = 400,
+                   fb_px: float = 0.7, min_left: int = 20):
+    """Features seeded in `mask` at frame i, followed frame by frame to frame j (either direction), each step
+    checked forward and backward. Returns the survivors' pixels at i and at j (or None if too few survive)."""
+    lk = dict(winSize=(21, 21), maxLevel=4, criteria=(cv2.TERM_CRITERIA_EPS | cv2.TERM_CRITERIA_COUNT, 30, 0.01))
+    p = cv2.goodFeaturesToTrack(gray[i], maxCorners=max_pts, qualityLevel=0.01, minDistance=7,
+                                mask=mask.astype(np.uint8) * 255)
+    if p is None:
+        return None
+    p0 = p.astype(np.float32)
+    cur, alive = p0.copy(), np.ones(len(p0), bool)
+    step = 1 if j > i else -1
+    for a in range(i, j, step):
+        b = a + step
+        nxt, st, _ = cv2.calcOpticalFlowPyrLK(gray[a], gray[b], cur, None, **lk)
+        back, st2, _ = cv2.calcOpticalFlowPyrLK(gray[b], gray[a], nxt, None, **lk)
+        alive &= (st.ravel() == 1) & (st2.ravel() == 1) & (np.linalg.norm((back - cur).reshape(-1, 2), axis=1) < fb_px)
+        cur = nxt
+        if alive.sum() < min_left:
+            return None
+    return p0.reshape(-1, 2)[alive], cur.reshape(-1, 2)[alive]
+
+
+def _sim_scale(a: np.ndarray, b: np.ndarray) -> float:
+    """The scale of the similarity best taking 2D points a onto b (Umeyama), refit once without outliers."""
+    def fit(p, q):
+        pc, qc = p.mean(0), q.mean(0)
+        H = (p - pc).T @ (q - qc)
+        U_, S, Vt = np.linalg.svd(H)
+        D = np.diag([1, np.sign(np.linalg.det(Vt.T @ U_.T))])
+        s = np.trace(np.diag(S) @ D) / ((p - pc) ** 2).sum()
+        R = Vt.T @ D @ U_.T
+        return s, R, qc - s * R @ pc
+    s, R, t = fit(a, b)
+    r = np.linalg.norm(a @ (s * R).T + t - b, axis=1)
+    keep = r < 3 * np.median(r) + 1e-9
+    return float(fit(a[keep], b[keep])[0]) if keep.sum() >= 8 else float(s)
+
+
+def lens_from_rigidity(chains, K: np.ndarray, n: np.ndarray, c: np.ndarray,
+                       k1s=np.round(np.arange(-0.4, 0.41, 0.02), 2), tilts_deg=(0.0,)) -> dict:
+    """The radial term (as `radial`) that keeps rigid bodies the same size as they move across the picture.
+    `chains`: (pixels at frame i, the same features at frame j, their heights along n) for parts of rigid bodies;
+    each feature meets the plane at its height in both frames, and the similarity between the two point sets
+    should have scale 1. A wrong radial term makes a body seem to grow or shrink as it moves between the centre
+    and the edge of the picture. A plane tilted the wrong way does too, growing from one side to the other rather
+    than from the centre out, so with `tilts_deg` the plane's tilt about its two in-plane axes is fitted with it.
+    Returns the best term (and tilt), the rms size change there, and the curve over k1 at the best tilt."""
+    e1 = np.array([1.0, 0, 0]) - n[0] * n
+    e1 /= np.linalg.norm(e1)
+    e2 = np.cross(n, e1)
+    best, curves = None, {}
+    for ta in tilts_deg:
+        for tb in tilts_deg:
+            nn = _turn(_turn(n, e1, np.radians(ta)), e2, np.radians(tb))
+            f1 = np.array([1.0, 0, 0]) - nn[0] * nn
+            f1 /= np.linalg.norm(f1)
+            f2 = np.cross(nn, f1)
+            curve = []
+            for k1 in k1s:
+                und = radial(K, k1)
+                ls = []
+                for p0, p1, hh in chains:
+                    X0, X1 = plane_point(und(p0), K, nn, c, hh), plane_point(und(p1), K, nn, c, hh)
+                    ls.append(np.log(_sim_scale(np.c_[X0 @ f1, X0 @ f2], np.c_[X1 @ f1, X1 @ f2])))
+                curve.append(float(np.mean(np.square(ls))))
+            curves[(ta, tb)] = curve
+            i = int(np.argmin(curve))
+            if best is None or curve[i] < best[0]:
+                best = (curve[i], float(k1s[i]), ta, tb, i, nn)
+    v, k1, ta, tb, i, nn = best
+    return {"k1": k1, "tilt_deg": (ta, tb), "n": nn, "rms_size_change_pct": round(float(np.sqrt(v)) * 100, 2),
+            "curve": [(float(k), round(x * 1e6, 2)) for k, x in zip(k1s, curves[(ta, tb)])],
+            "at_edge": i in (0, len(k1s) - 1) or (len(tilts_deg) > 1 and (abs(ta) == max(np.abs(tilts_deg)) or abs(tb) == max(np.abs(tilts_deg)))),
+            "chains": len(chains)}
