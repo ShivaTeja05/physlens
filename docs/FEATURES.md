@@ -1,10 +1,10 @@
 # PhysLens features in detail (Lab, Scan, records, crash reconstruction, 3D world, MuJoCo)
 
-> **Versions.** This branch (`simulator`, tag `v2.0-simulator`) has everything: the core Lab (also on `main`, tag
-> `v1.0-normal`) plus the simulator work: what-if replays, crash reconstruction from NHTSA crash tests, the 3D world
-> (Rapier) and MuJoCo fits, physics from a moving camera, and 3D point worlds of real footage
-> (`benchmark/MOVING_CAMERA.md`, `benchmark/REAL_VEHICLES.md`), now with full-resolution MoGe-3 depth, SAM 3.1 video
-> tracking and per-object fusion for sizes (`benchmark/SHARP_POINTS.md`).
+> **Versions.** `main` has everything: the core Lab (tag `v1.0-normal` is the Lab alone) plus the simulator work:
+> what-if replays, crash reconstruction from NHTSA crash tests, the 3D world (Rapier) and MuJoCo fits, physics from a
+> moving camera, and 3D point worlds of real footage (`benchmark/MOVING_CAMERA.md`, `benchmark/REAL_VEHICLES.md`),
+> with full-resolution MoGe-3 depth, SAM 3.1 video tracking and per-object fusion for sizes
+> (`benchmark/SHARP_POINTS.md`). Tag `v2.0-simulator` marks the first simulator release.
 
 The Lab started as a vertical slice built around **drop & bounce** plus three stage experiments (*Catch the cup*, *Mystery Cans*, *Weigh it by watching*). You upload a clip (or pick a test clip), the engine tracks the ball, measures gravity and bounciness with error bars, locks predictions for the next bounce using only earlier frames, checks them, and explains the result. The stage display plays it all back in sync with the video, keynote style.
 

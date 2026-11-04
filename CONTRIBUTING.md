@@ -1,11 +1,11 @@
 # Working on PhysLens together
 
 ## Branches
-- `main`: the stable Lab (tag `v1.0-normal`).
-- `simulator`: everything, including the 3D simulator and the crash measurements (tag `v2.0-simulator`). Work
-  from here.
-- New work: a branch off `simulator` named for the change (`scan-extract-objects`, `lens-grid-calibration`), then a
-  pull request into `simulator`. Keep pull requests to one change.
+- `main`: the current project, everything (Lab, Scan, 3D simulator, crash measurements, docs). Work from here.
+- `simulator`: kept level with `main` for links that point at it; don't start new work on it.
+- Tags mark earlier versions: `v1.0-normal` (the Lab alone), `v2.0-simulator` (the first simulator release).
+- New work: a branch off `main` named for the change (`scan-extract-objects`, `lens-grid-calibration`), then a pull
+  request into `main`. Keep pull requests to one change.
 
 ## Before you push
 ```bash
