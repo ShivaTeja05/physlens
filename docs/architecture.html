@@ -1,0 +1,291 @@
+<title>PhysLens Architecture</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@75..100,500..800&family=Source+Sans+3:wght@400;600&family=JetBrains+Mono:wght@500&display=swap">
+<style>
+  /* Layout: a lab notebook page &#8212; one column of figures, each a full-width plate with its claim underneath. */
+  :root {
+    --bg: #eef2f4; --plate: #fbfcfd; --panel: #ffffff; --ink: #15212b; --muted: #5b6976; --line: #c4cfd8;
+    --accent: #0a8aa3;  /* PhysLens engine */
+    --meta: #b46a00;    /* Meta AI */
+    --gpu: #3b62b5;     /* GPU worker */
+    --truth: #2b8a4a;   /* ground truth, used only to check */
+    --pred: #7b56c9;    /* predicted points */
+    --f-display: "Archivo", "Helvetica Neue", Arial, sans-serif;
+    --f-body: "Source Sans 3", "Segoe UI", Helvetica, Arial, sans-serif;
+    --f-mono: "JetBrains Mono", ui-monospace, Menlo, Consolas, monospace;
+  }
+  @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+    --bg: #0a1015; --plate: #0f171e; --panel: #121c25; --ink: #e5ecf2; --muted: #93a3b1; --line: #2a3946;
+    --accent: #3fd0e8; --meta: #f2a640; --gpu: #86a3ff; --truth: #6fd08f; --pred: #b49bff; color-scheme: dark } }
+  :root[data-theme="dark"] {
+    --bg: #0a1015; --plate: #0f171e; --panel: #121c25; --ink: #e5ecf2; --muted: #93a3b1; --line: #2a3946;
+    --accent: #3fd0e8; --meta: #f2a640; --gpu: #86a3ff; --truth: #6fd08f; --pred: #b49bff; color-scheme: dark }
+  body { background: var(--bg); color: var(--ink); font: 16px/1.55 var(--f-body); }
+  .wrap { max-width: 1240px; margin: 0 auto; padding-block: 36px 64px;
+    padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+  header { display: grid; gap: 10px; margin-bottom: 26px; }
+  .eyebrow { font: 500 12px var(--f-mono); letter-spacing: 0.1em; text-transform: uppercase; color: var(--accent); }
+  h1 { font: 800 clamp(30px, 5vw, 46px)/1.05 var(--f-display); font-stretch: 85%; margin: 0; text-wrap: balance; }
+  .lede { max-width: 68ch; color: var(--muted); margin: 0; }
+  .legend { display: flex; flex-wrap: wrap; gap: 8px 18px; font-size: 14px; color: var(--muted); margin-top: 6px; }
+  .legend span { display: inline-flex; align-items: center; gap: 7px; }
+  .sw { width: 22px; height: 12px; border-radius: 3px; border: 2px solid currentColor; display: inline-block; }
+  .sw.meta { color: var(--meta); } .sw.gpu { color: var(--gpu); } .sw.ours { color: var(--accent); }
+  .sw.truth { color: var(--truth); border-style: dashed; } .sw.pred { color: var(--pred); background: color-mix(in srgb, var(--pred) 18%, transparent); }
+  section { margin-top: 34px; display: grid; gap: 10px; }
+  h2 { font: 700 22px/1.2 var(--f-display); font-stretch: 90%; margin: 0; text-wrap: balance; }
+  h2 small { font: 500 12px var(--f-mono); color: var(--muted); letter-spacing: 0.06em; margin-right: 10px; vertical-align: 3px; }
+  figure { margin: 0; background: var(--plate); border: 1px solid var(--line); border-radius: 10px; }
+  .scroll { overflow-x: auto; padding: 14px 10px 6px; }
+  figcaption { padding: 4px 18px 16px; color: var(--muted); font-size: 15px; max-width: 95ch; }
+  figcaption b { color: var(--ink); font-weight: 600; }
+  svg.dg { display: block; width: 100%; height: auto; color: var(--muted); }
+  svg.f1 { min-width: 1080px; } svg.f2 { min-width: 980px; } svg.f3 { min-width: 980px; } svg.f4 { min-width: 900px; }
+  .dg .n rect { fill: var(--panel); stroke: var(--line); stroke-width: 1.2; }
+  .dg .n.ours rect { stroke: var(--accent); stroke-width: 1.7; }
+  .dg .n.meta rect { stroke: var(--meta); stroke-width: 1.7; }
+  .dg .n.gpu rect { stroke: var(--gpu); stroke-width: 1.7; }
+  .dg .n.truth rect { stroke: var(--truth); stroke-width: 1.7; stroke-dasharray: 6 4; }
+  .dg .n.pred rect { stroke: var(--pred); stroke-width: 1.7; fill: color-mix(in srgb, var(--pred) 10%, var(--panel)); }
+  .dg .grp { fill: none; stroke: var(--gpu); stroke-width: 1.2; stroke-dasharray: 3 4; }
+  .dg .t { font: 600 13px var(--f-body); fill: var(--ink); }
+  .dg .s { font: 400 11.5px var(--f-body); fill: var(--muted); }
+  .dg .h { font: 500 11px var(--f-mono); letter-spacing: 0.08em; fill: var(--ink); }
+  .dg .hs { font: 400 11px var(--f-body); fill: var(--muted); }
+  .dg .g { font: 500 10px var(--f-mono); fill: var(--gpu); letter-spacing: 0.04em; }
+  .dg .lb { font: 500 10px var(--f-mono); fill: var(--muted); paint-order: stroke; stroke: var(--plate); stroke-width: 4px; stroke-linejoin: round; }
+  .dg .a { fill: none; stroke: var(--muted); stroke-width: 1.3; }
+  .dg .a.dash { stroke: var(--truth); stroke-dasharray: 5 4; }
+  .dg .a.key { stroke: var(--accent); stroke-width: 1.8; }
+  .dg .lane { font: 500 11px var(--f-mono); letter-spacing: 0.06em; fill: var(--accent); }
+  table { border-collapse: collapse; width: 100%; font-size: 15px; font-variant-numeric: tabular-nums; }
+  th, td { text-align: left; padding: 9px 12px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { font: 500 12px var(--f-mono); letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); }
+  td b { color: var(--accent); font-weight: 600; }
+  .tbl { background: var(--plate); border: 1px solid var(--line); border-radius: 10px; overflow-x: auto; }
+  .tbl table { min-width: 640px; }
+  .note { color: var(--muted); font-size: 14px; }
+  code { font: 500 13px var(--f-mono); }
+</style>
+
+<div class="wrap">
+  <header>
+    <div class="eyebrow">PhysLens Lab &#183; simulator branch &#183; 4 Nov 2026</div>
+    <h1>PhysLens architecture</h1>
+    <p class="lede">How a video or a photo becomes a measured 3D world and an explained physical event, checked against known values. Four figures: the whole flow, the simulator's core, the photo and Lab paths, and where each part runs.</p>
+    <div class="legend" aria-label="Colour key">
+      <span><i class="sw meta"></i>Meta AI (SAM 3.1, Muse Spark, Muse Voice)</span>
+      <span><i class="sw gpu"></i>GPU worker on RunPod (MapAnything, MoGe-3)</span>
+      <span><i class="sw ours"></i>PhysLens engine (our code)</span>
+      <span><i class="sw truth"></i>Ground truth: only to check</span>
+      <span><i class="sw pred"></i>Predicted, labelled</span>
+    </div>
+  </header>
+
+  <!-- ========================= Figure 1 ========================= -->
+  <section id="flow">
+    <h2><small>FIG. 1</small>From video to an explained 3D world</h2>
+    <figure>
+      <div class="scroll">
+        <svg class="dg f1" viewBox="0 0 1240 720" role="img" aria-label="End-to-end flow: video, photo and questions go through Meta AI perception and GPU depth, are measured by the PhysLens engine as bodies and motion, turned into events, checked against ground truth, and shown in the 3D simulator.">
+          <defs><marker id="m1" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="currentColor"/></marker></defs>
+          <!-- column headers -->
+          <text class="h" x="20" y="24">INPUT</text><text class="hs" x="20" y="40">what you give it</text>
+          <text class="h" x="225" y="24">SEE &#183; META AI</text><text class="hs" x="225" y="40">objects, names, speech</text>
+          <text class="h" x="430" y="24">3D &#183; GPU + ENGINE</text><text class="hs" x="575" y="24" text-anchor="start"></text>
+          <text class="h" x="650" y="24">MEASURE &#183; ENGINE</text><text class="hs" x="650" y="40">bodies and motion</text>
+          <text class="h" x="895" y="24">UNDERSTAND</text><text class="hs" x="895" y="40">events, checks, words</text>
+          <text class="h" x="1080" y="24">SHOW</text><text class="hs" x="1080" y="40">files and views</text>
+
+          <!-- column 1 -->
+          <g class="n"><rect x="20" y="64" width="170" height="96" rx="6"/><text class="t" x="32" y="86">Video</text><text class="s" x="32" y="104">fixed or moving camera</text><text class="s" x="32" y="120">one or several cameras</text><text class="s" x="32" y="136">30 to 1,000 fps</text></g>
+          <g class="n"><rect x="20" y="196" width="170" height="56" rx="6"/><text class="t" x="32" y="218">Photo</text><text class="s" x="32" y="236">a still scene (Scan)</text></g>
+          <g class="n"><rect x="20" y="298" width="170" height="56" rx="6"/><text class="t" x="32" y="320">Question</text><text class="s" x="32" y="338">typed or spoken</text></g>
+          <g class="n truth"><rect x="20" y="636" width="170" height="72" rx="6"/><text class="t" x="32" y="658">Known values</text><text class="s" x="32" y="676">speed trap, accelerometers,</text><text class="s" x="32" y="692">published sizes</text></g>
+
+          <!-- column 2 -->
+          <g class="n meta"><rect x="225" y="64" width="175" height="96" rx="6"/><text class="t" x="237" y="86">SAM 3.1</text><text class="s" x="237" y="104">finds objects by name</text><text class="s" x="237" y="120">keeps one identity</text><text class="s" x="237" y="136">through the video</text></g>
+          <g class="n meta"><rect x="225" y="186" width="175" height="96" rx="6"/><text class="t" x="237" y="208">Muse Spark</text><text class="s" x="237" y="226">names the object and</text><text class="s" x="237" y="242">its published size;</text><text class="s" x="237" y="258">reads a photo's parts</text></g>
+          <g class="n meta"><rect x="225" y="306" width="175" height="52" rx="6"/><text class="t" x="237" y="328">Muse Voice</text><text class="s" x="237" y="346">speech to text</text></g>
+
+          <!-- column 3 -->
+          <rect class="grp" x="422" y="54" width="206" height="176" rx="8"/><text class="g" x="430" y="70">RUNPOD GPU &#183; 24 GB</text>
+          <g class="n gpu"><rect x="430" y="80" width="190" height="64" rx="6"/><text class="t" x="442" y="102">MapAnything</text><text class="s" x="442" y="120">camera poses, metric</text><text class="s" x="442" y="136">depth, lens</text></g>
+          <g class="n gpu"><rect x="430" y="156" width="190" height="64" rx="6"/><text class="t" x="442" y="178">MoGe-3</text><text class="s" x="442" y="196">full-resolution depth,</text><text class="s" x="442" y="212">normals, its own lens</text></g>
+          <g class="n ours"><rect x="430" y="262" width="190" height="122" rx="6"/><text class="t" x="442" y="284">Geometry clean-up</text><text class="s" x="442" y="302">one pose for a fixed camera</text><text class="s" x="442" y="318">floor: level plane below it</text><text class="s" x="442" y="334">MoGe-3 fitted to MapAnything</text><text class="s" x="442" y="350">around the object</text><text class="s" x="442" y="366">edge and background filters</text></g>
+
+          <!-- column 4 -->
+          <g class="n ours"><rect x="650" y="64" width="200" height="104" rx="6"/><text class="t" x="662" y="86">Object body &#183; objsim</text><text class="s" x="662" y="104">1  extract each frame's points</text><text class="s" x="662" y="120">2  combine: one body + poses</text><text class="s" x="662" y="136">3  analyse: sides never seen</text><text class="s" x="662" y="152">3b predict, labelled (mirror)</text></g>
+          <g class="n ours"><rect x="650" y="214" width="200" height="118" rx="6"/><text class="t" x="662" y="236">Hybrid motion &#183; hybrid.py</text><text class="s" x="662" y="254">features tracked every frame</text><text class="s" x="662" y="270">on a plane from the scene</text><text class="s" x="662" y="286">(wheels' sizes, the roof)</text><text class="s" x="662" y="302">lens term from physics</text><text class="s" x="662" y="318">one reference length</text></g>
+          <g class="n ours"><rect x="650" y="520" width="200" height="90" rx="6"/><text class="t" x="662" y="542">Lab &#183; 2D</text><text class="s" x="662" y="560">tracker &#8594; pixels per metre</text><text class="s" x="662" y="576">race of physical laws</text><text class="s" x="662" y="592">predictions locked first</text></g>
+
+          <!-- column 5 -->
+          <g class="n ours"><rect x="895" y="64" width="165" height="104" rx="6"/><text class="t" x="907" y="86">Events &#183; events3d</text><text class="s" x="907" y="104">contact with structures</text><text class="s" x="907" y="120">braking, stop, crush</text><text class="s" x="907" y="136">height check</text><text class="s" x="907" y="152">rigid-body completion</text></g>
+          <g class="n meta"><rect x="895" y="206" width="165" height="90" rx="6"/><text class="t" x="907" y="228">Muse Spark explains</text><text class="s" x="907" y="246">answers from measured</text><text class="s" x="907" y="262">facts only; every</text><text class="s" x="907" y="278">number is checked</text></g>
+          <g class="n truth"><rect x="895" y="440" width="165" height="76" rx="6"/><text class="t" x="907" y="462">Check vs ground truth</text><text class="s" x="907" y="480">truth tables,</text><text class="s" x="907" y="496">benchmark/EVENTS.md</text></g>
+
+          <!-- column 6 -->
+          <g class="n"><rect x="1080" y="64" width="145" height="112" rx="6"/><text class="t" x="1092" y="86">Point world file</text><text class="s" x="1092" y="104">points + colours</text><text class="s" x="1092" y="120">groups: world, moments,</text><text class="s" x="1092" y="136">body, predicted side</text><text class="s" x="1092" y="152">notes: events, poses,</text><text class="s" x="1092" y="168">truth table</text></g>
+          <g class="n ours"><rect x="1080" y="214" width="145" height="104" rx="6"/><text class="t" x="1092" y="236">3D simulator &#183; web</text><text class="s" x="1092" y="254">body moves on poses</text><text class="s" x="1092" y="270">event timeline</text><text class="s" x="1092" y="286">impact close-up</text><text class="s" x="1092" y="302">crush chart, ask</text></g>
+          <g class="n"><rect x="1080" y="350" width="145" height="56" rx="6"/><text class="t" x="1092" y="372">Shared link</text><text class="s" x="1092" y="390">static copy, no engine</text></g>
+          <g class="n ours"><rect x="1080" y="530" width="145" height="72" rx="6"/><text class="t" x="1092" y="552">Lab and Scan views</text><text class="s" x="1092" y="570">replay, what-if,</text><text class="s" x="1092" y="586">parts and sizes</text></g>
+
+          <!-- arrows -->
+          <path class="a" d="M190,96 H225" marker-end="url(#m1)"/><text class="lb" x="207" y="90" text-anchor="middle">frames</text>
+          <path class="a" d="M150,64 V50 H460 V80" marker-end="url(#m1)"/><text class="lb" x="330" y="62" text-anchor="middle">keyframes</text>
+          <path class="a key" d="M20,150 H8 V496 H760" /><path class="a key" d="M700,496 V332" marker-end="url(#m1)"/><path class="a key" d="M760,496 V520" marker-end="url(#m1)"/><text class="lb" x="330" y="489" text-anchor="middle">every frame, in 2D</text>
+          <path class="a" d="M190,224 H225" marker-end="url(#m1)"/><text class="lb" x="207" y="218" text-anchor="middle">look</text>
+          <path class="a" d="M190,326 H225" marker-end="url(#m1)"/><text class="lb" x="207" y="320" text-anchor="middle">voice</text>
+          <path class="a" d="M400,140 H414 V300 H430" marker-end="url(#m1)"/><text class="lb" x="405" y="297" text-anchor="end">masks</text>
+          <path class="a" d="M525,230 V262" marker-end="url(#m1)"/><text class="lb" x="532" y="257">depth, poses</text>
+          <path class="a" d="M620,284 H634 V150 H650" marker-end="url(#m1)"/><text class="lb" x="0" y="0" transform="translate(641,222) rotate(-90)" text-anchor="middle">object points</text>
+          <path class="a" d="M400,244 H408 a6,6 0 0 1 12,0 H626 V100 H650" marker-end="url(#m1)"/><text class="lb" x="470" y="239" text-anchor="middle">published size</text>
+          <path class="a" d="M620,330 H650" marker-end="url(#m1)"/><text class="lb" x="626" y="350">lens, floor</text>
+          <path class="a" d="M850,112 H895" marker-end="url(#m1)"/><text class="lb" x="872" y="106" text-anchor="middle">poses</text>
+          <path class="a key" d="M850,262 H872 V150 H895" marker-end="url(#m1)"/><text class="lb" x="0" y="0" transform="translate(880,208) rotate(-90)" text-anchor="middle">speed, crush</text>
+          <path class="a" d="M400,332 H410 V410 H694 a6,6 0 0 1 12,0 H882 V280 H895" marker-end="url(#m1)"/><text class="lb" x="560" y="404" text-anchor="middle">question</text>
+          <path class="a" d="M977,168 V206" marker-end="url(#m1)"/><text class="lb" x="984" y="191">facts</text>
+          <path class="a" d="M977,296 V440" marker-end="url(#m1)"/><text class="lb" x="984" y="372">measured values</text>
+          <path class="a dash" d="M190,672 H977 V516" marker-end="url(#m1)"/><text class="lb" x="560" y="665" text-anchor="middle" style="fill:var(--truth)">only to check, never an input</text>
+          <path class="a" d="M1060,100 H1080" marker-end="url(#m1)"/>
+          <path class="a" d="M1060,478 H1070 V162 H1080" marker-end="url(#m1)"/><text class="lb" x="0" y="0" transform="translate(1066,330) rotate(-90)" text-anchor="middle">truth table</text>
+          <path class="a" d="M1152,176 V214" marker-end="url(#m1)"/><text class="lb" x="1158" y="199">loads</text>
+          <path class="a" d="M1152,318 V350" marker-end="url(#m1)"/><text class="lb" x="1158" y="338">web_copy</text>
+          <path class="a" d="M850,565 H971 a6,6 0 0 1 12,0 H1080" marker-end="url(#m1)"/><text class="lb" x="925" y="558" text-anchor="middle">run events</text>
+        </svg>
+      </div>
+      <figcaption><b>Two routes from the same video.</b> Keyframes (about 49) go to SAM 3.1 and the GPU for shape and position; every frame goes straight to 2D tracking for accurate motion (teal line). Both meet in the engine, which turns them into events and a point world. Known values enter only at the check, never as an input.</figcaption>
+    </figure>
+  </section>
+
+  <!-- ========================= Figure 2 ========================= -->
+  <section id="core">
+    <h2><small>FIG. 2</small>The simulator's core: one body, accurate motion</h2>
+    <figure>
+      <div class="scroll">
+        <svg class="dg f2" viewBox="0 0 1180 440" role="img" aria-label="Keyframes become one body of real points with a pose per frame through repeated registration, with unseen sides reported and predicted by mirror symmetry; every frame gives metric motion through 2D features on a plane from the scene, a lens term from physics and one known length; the simulator plays the body on that motion.">
+          <defs><marker id="m2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="currentColor"/></marker></defs>
+          <text class="lane" x="170" y="30">KEYFRAMES (ABOUT 49) &#183; SHAPE AND POSITION</text>
+          <text class="lane" x="170" y="262">EVERY FRAME (UP TO 1,000 A SECOND) &#183; ACCURATE MOTION</text>
+
+          <g class="n"><rect x="20" y="180" width="120" height="76" rx="6"/><text class="t" x="32" y="202">Video frames</text><text class="s" x="32" y="220">one camera,</text><text class="s" x="32" y="236">fixed or moving</text></g>
+
+          <g class="n ours"><rect x="170" y="62" width="150" height="80" rx="6"/><text class="t" x="182" y="84">1 Extract</text><text class="s" x="182" y="102">SAM mask on depth:</text><text class="s" x="182" y="118">each frame's points,</text><text class="s" x="182" y="134">background removed</text></g>
+          <g class="n ours"><rect x="344" y="62" width="150" height="80" rx="6"/><text class="t" x="356" y="84">2 Register</text><text class="s" x="356" y="102">turn + shift (ICP);</text><text class="s" x="356" y="118">a face seen in every</text><text class="s" x="356" y="134">frame pins the slide</text></g>
+          <g class="n ours"><rect x="518" y="62" width="150" height="80" rx="6"/><text class="t" x="530" y="84">One body</text><text class="s" x="530" y="102">its own coordinates,</text><text class="s" x="530" y="118">a pose per frame,</text><text class="s" x="530" y="134">rigid stretch only</text></g>
+          <g class="n ours"><rect x="692" y="62" width="150" height="80" rx="6"/><text class="t" x="704" y="84">3 Analyse</text><text class="s" x="704" y="102">each side: share with</text><text class="s" x="704" y="118">points, frames that</text><text class="s" x="704" y="134">saw it; gaps reported</text></g>
+          <g class="n pred"><rect x="866" y="62" width="150" height="80" rx="6"/><text class="t" x="878" y="84">3b Predict</text><text class="s" x="878" y="102">hidden side by mirror</text><text class="s" x="878" y="118">symmetry, drawn</text><text class="s" x="878" y="134">violet, never measured</text></g>
+
+          <g class="n meta"><rect x="866" y="172" width="150" height="62" rx="6"/><text class="t" x="878" y="194">Muse Spark</text><text class="s" x="878" y="212">identified model's</text><text class="s" x="878" y="228">published size</text></g>
+
+          <g class="n ours"><rect x="170" y="290" width="150" height="80" rx="6"/><text class="t" x="182" y="312">Features</text><text class="s" x="182" y="330">on a rigid part: above</text><text class="s" x="182" y="346">the wheels, away from</text><text class="s" x="182" y="362">the impact</text></g>
+          <g class="n ours"><rect x="344" y="290" width="150" height="80" rx="6"/><text class="t" x="356" y="312">Ray meets a plane</text><text class="s" x="356" y="330">plane from the scene:</text><text class="s" x="356" y="346">wheels' apparent sizes,</text><text class="s" x="356" y="362">or the roof from above</text></g>
+          <g class="n ours"><rect x="518" y="290" width="150" height="80" rx="6"/><text class="t" x="530" y="312">Median step</text><text class="s" x="530" y="330">along the travel,</text><text class="s" x="530" y="346">summed frame by frame;</text><text class="s" x="530" y="362">turn from the features</text></g>
+          <g class="n ours"><rect x="692" y="290" width="150" height="80" rx="6"/><text class="t" x="704" y="312">Lens from physics</text><text class="s" x="704" y="330">the steady approach</text><text class="s" x="704" y="346">must read constant:</text><text class="s" x="704" y="362">that fixes distortion</text></g>
+          <g class="n truth"><rect x="866" y="290" width="150" height="80" rx="6"/><text class="t" x="878" y="312">One known length</text><text class="s" x="878" y="330">wheelbase or width,</text><text class="s" x="878" y="346">or the identified</text><text class="s" x="878" y="362">model's size</text></g>
+
+          <g class="n ours"><rect x="1046" y="166" width="120" height="104" rx="6"/><text class="t" x="1058" y="188">Simulator</text><text class="s" x="1058" y="206">the body plays</text><text class="s" x="1058" y="222">on the measured</text><text class="s" x="1058" y="238">motion; events</text><text class="s" x="1058" y="254">from its curve</text></g>
+
+          <path class="a" d="M140,200 H152 V102 H170" marker-end="url(#m2)"/>
+          <path class="a key" d="M140,236 H152 V330 H170" marker-end="url(#m2)"/>
+          <path class="a" d="M320,102 H344" marker-end="url(#m2)"/>
+          <path class="a" d="M494,102 H518" marker-end="url(#m2)"/>
+          <path class="a" d="M593,62 V46 H419 V62" marker-end="url(#m2)"/><text class="lb" x="506" y="42" text-anchor="middle">repeat until no pose moves &gt; 1 cm</text>
+          <path class="a" d="M668,102 H692" marker-end="url(#m2)"/>
+          <path class="a" d="M842,102 H866" marker-end="url(#m2)"/>
+          <path class="a" d="M941,172 V142" marker-end="url(#m2)"/><text class="lb" x="948" y="162">width</text>
+          <path class="a" d="M941,234 V290" marker-end="url(#m2)"/><text class="lb" x="948" y="266">length</text>
+          <path class="a key" d="M320,330 H344" marker-end="url(#m2)"/>
+          <path class="a key" d="M494,330 H518" marker-end="url(#m2)"/>
+          <path class="a key" d="M668,330 H692" marker-end="url(#m2)"/>
+          <path class="a key" d="M842,330 H866" marker-end="url(#m2)"/>
+          <path class="a" d="M1016,102 H1031 V200 H1046" marker-end="url(#m2)"/><text class="lb" x="0" y="0" transform="translate(1038,140) rotate(-90)" text-anchor="middle">body</text>
+          <path class="a key" d="M1016,330 H1031 V240 H1046" marker-end="url(#m2)"/><text class="lb" x="0" y="0" transform="translate(1038,292) rotate(-90)" text-anchor="middle">x(t), turn(t)</text>
+          <text class="s" x="170" y="410">Per-frame AI depth jitters about 10 cm, more than a crash moves in 1 ms, so motion comes from the lower lane.</text>
+          <text class="s" x="170" y="428">Tested: frontal crash 56.81 km/h vs 56.55 (NHTSA); crush curve within 1.5 cm of the accelerometers; pole crash 31.29 km/h vs 31.09.</text>
+        </svg>
+      </div>
+      <figcaption><b>Shape from keyframes, motion from every frame.</b> The upper lane gathers each frame's points into one rigid body and repeats the registration until nothing moves; what no frame saw is reported, and predicted only by stated symmetry. The lower lane measures motion without per-frame depth: image features, a plane taken from the scene itself, the lens corrected by the physics of a steady approach, and one known length for metres.</figcaption>
+    </figure>
+  </section>
+
+  <!-- ========================= Figure 3 ========================= -->
+  <section id="paths">
+    <h2><small>FIG. 3</small>The photo path (Scan) and the Lab path</h2>
+    <figure>
+      <div class="scroll">
+        <svg class="dg f3" viewBox="0 0 1180 290" role="img" aria-label="Scan: a photo goes to Muse Spark for parts and relations, SAM 3.1 outlines each part, sizes come from a known reference, the words are checked against the measurements, and the Scan view shows it. Lab: a clip is tracked, calibrated in pixels per metre, physical laws race, predictions are locked before the moment, verdicts and narration follow, and the Lab view replays it.">
+          <defs><marker id="m3" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="currentColor"/></marker></defs>
+          <text class="lane" x="20" y="24">PHOTO &#183; SCAN</text>
+          <g class="n"><rect x="20" y="36" width="160" height="76" rx="6"/><text class="t" x="32" y="58">Photo</text><text class="s" x="32" y="76">upload or sample;</text><text class="s" x="32" y="92">optional known size</text></g>
+          <g class="n meta"><rect x="214" y="36" width="160" height="76" rx="6"/><text class="t" x="226" y="58">Look</text><text class="s" x="226" y="76">Muse Spark: parts,</text><text class="s" x="226" y="92">relations, how it works</text></g>
+          <g class="n meta"><rect x="408" y="36" width="160" height="76" rx="6"/><text class="t" x="420" y="58">Outline</text><text class="s" x="420" y="76">SAM 3.1 finds every</text><text class="s" x="420" y="92">instance of each part</text></g>
+          <g class="n ours"><rect x="602" y="36" width="160" height="76" rx="6"/><text class="t" x="614" y="58">Measure</text><text class="s" x="614" y="76">sizes from a reference,</text><text class="s" x="614" y="92">counts, rows, contacts</text></g>
+          <g class="n ours"><rect x="796" y="36" width="160" height="76" rx="6"/><text class="t" x="808" y="58">Check the words</text><text class="s" x="808" y="76">what Muse said vs</text><text class="s" x="808" y="92">what was measured</text></g>
+          <g class="n ours"><rect x="990" y="36" width="170" height="76" rx="6"/><text class="t" x="1002" y="58">Scan view</text><text class="s" x="1002" y="76">parts, sizes, how it</text><text class="s" x="1002" y="92">works; ask by voice</text></g>
+          <path class="a" d="M180,74 H214" marker-end="url(#m3)"/><path class="a" d="M374,74 H408" marker-end="url(#m3)"/><text class="lb" x="391" y="68" text-anchor="middle">parts</text>
+          <path class="a" d="M568,74 H602" marker-end="url(#m3)"/><text class="lb" x="585" y="68" text-anchor="middle">masks</text>
+          <path class="a" d="M762,74 H796" marker-end="url(#m3)"/><path class="a" d="M956,74 H990" marker-end="url(#m3)"/>
+
+          <text class="lane" x="20" y="164">VIDEO &#183; LAB (2D)</text>
+          <g class="n"><rect x="20" y="176" width="160" height="92" rx="6"/><text class="t" x="32" y="198">Clip</text><text class="s" x="32" y="216">drop, bounce, crash,</text><text class="s" x="32" y="232">springs, catch the cup;</text><text class="s" x="32" y="248">known size if given</text></g>
+          <g class="n meta"><rect x="214" y="176" width="160" height="92" rx="6"/><text class="t" x="226" y="198">Track</text><text class="s" x="226" y="216">SAM 3.1 (or OpenCV)</text><text class="s" x="226" y="232">follows the object</text><text class="s" x="226" y="248">frame by frame</text></g>
+          <g class="n ours"><rect x="408" y="176" width="160" height="92" rx="6"/><text class="t" x="420" y="198">Calibrate</text><text class="s" x="420" y="216">pixels per metre from</text><text class="s" x="420" y="232">a known size; tests</text><text class="s" x="420" y="248">for perspective</text></g>
+          <g class="n ours"><rect x="602" y="176" width="160" height="92" rx="6"/><text class="t" x="614" y="198">Race of laws</text><text class="s" x="614" y="216">constant speed, free</text><text class="s" x="614" y="232">fall, drag&#8230;: best fit</text><text class="s" x="614" y="248">by evidence (AIC)</text></g>
+          <g class="n ours"><rect x="796" y="176" width="160" height="92" rx="6"/><text class="t" x="808" y="198">Predict, then see</text><text class="s" x="808" y="216">next bounce locked</text><text class="s" x="808" y="232">(hashed) before it</text><text class="s" x="808" y="248">happens; hit or miss</text></g>
+          <g class="n ours"><rect x="990" y="176" width="170" height="92" rx="6"/><text class="t" x="1002" y="198">Lab view</text><text class="s" x="1002" y="216">Muse Spark narrates;</text><text class="s" x="1002" y="232">replay and what-if</text><text class="s" x="1002" y="248">(Rapier, MuJoCo fit)</text></g>
+          <path class="a" d="M180,222 H214" marker-end="url(#m3)"/><path class="a" d="M374,222 H408" marker-end="url(#m3)"/><text class="lb" x="391" y="216" text-anchor="middle">pixels</text>
+          <path class="a" d="M568,222 H602" marker-end="url(#m3)"/><text class="lb" x="585" y="216" text-anchor="middle">metres</text>
+          <path class="a" d="M762,222 H796" marker-end="url(#m3)"/><text class="lb" x="779" y="216" text-anchor="middle">law</text>
+          <path class="a" d="M956,222 H990" marker-end="url(#m3)"/>
+        </svg>
+      </div>
+      <figcaption><b>The same perception, two other jobs.</b> A photo is read by Muse Spark, outlined by SAM 3.1 and measured, and Muse Spark's words are checked against the measurements. A Lab clip is tracked in 2D, calibrated, and the physical law that fits best is found; predictions are locked before the moment they predict, so the verdict is honest.</figcaption>
+    </figure>
+  </section>
+
+  <!-- ========================= Figure 4 ========================= -->
+  <section id="runs">
+    <h2><small>FIG. 4</small>Where each part runs</h2>
+    <figure>
+      <div class="scroll">
+        <svg class="dg f4" viewBox="0 0 1180 330" role="img" aria-label="The browser talks to the web server on port 5173, which forwards API and media requests to the PhysLens engine on port 8000; the engine calls the Meta Model API and sends frames to a RunPod serverless GPU worker built from GitHub; a static copy of the simulator is published as a shared link.">
+          <defs><marker id="m4" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="currentColor"/></marker></defs>
+          <g class="n ours"><rect x="20" y="96" width="200" height="96" rx="6"/><text class="t" x="32" y="118">Browser</text><text class="s" x="32" y="136">React + three.js</text><text class="s" x="32" y="152">Lab, Scan, 3D simulator</text><text class="s" x="32" y="168">voice in, speech out</text></g>
+          <g class="n"><rect x="20" y="236" width="200" height="66" rx="6"/><text class="t" x="32" y="258">Shared link</text><text class="s" x="32" y="276">sim.html + worlds as text;</text><text class="s" x="32" y="292">opens anywhere, no engine</text></g>
+          <g class="n"><rect x="270" y="96" width="170" height="96" rx="6"/><text class="t" x="282" y="118">Web server &#183; :5173</text><text class="s" x="282" y="136">serves the app;</text><text class="s" x="282" y="152">forwards /api and</text><text class="s" x="282" y="168">/media to the engine</text></g>
+          <g class="n ours"><rect x="490" y="56" width="250" height="176" rx="6"/><text class="t" x="502" y="78">PhysLens engine &#183; :8000</text><text class="s" x="502" y="96">FastAPI, Python</text><text class="s" x="502" y="112">Lab pipeline, Scan, ask, voice</text><text class="s" x="502" y="128">objsim, hybrid, events3d, priors</text><text class="s" x="502" y="144">caches: records/ (depth, masks)</text><text class="s" x="502" y="160">worlds: media/pointworld/</text><text class="s" x="502" y="176">spend ledger and $50 cap</text><text class="s" x="502" y="192">keys only in backend/.env</text><text class="s" x="502" y="208">(never in git, never printed)</text></g>
+          <g class="n meta"><rect x="800" y="30" width="360" height="104" rx="6"/><text class="t" x="812" y="52">Meta Model API</text><text class="s" x="812" y="70">SAM 3.1: segmentation, video tracking</text><text class="s" x="812" y="86">Muse Spark: looks, names, explains, answers</text><text class="s" x="812" y="102">Muse Voice: speech to text</text><text class="s" x="812" y="118">about $10 of the $50 cap used so far</text></g>
+          <g class="n gpu"><rect x="800" y="158" width="360" height="120" rx="6"/><text class="t" x="812" y="180">RunPod serverless GPU</text><text class="s" x="812" y="198">one 24 GB GPU per job (4090, A5000, L4, 3090)</text><text class="s" x="812" y="214">0 workers when idle, 60 s idle timeout</text><text class="s" x="812" y="230">MapAnything + MoGe-3; 20 MB per request</text><text class="s" x="812" y="246">image built from GitHub on push</text><text class="s" x="812" y="262">(ShivaTeja05/physlens-gpu-worker)</text></g>
+          <g class="n"><rect x="490" y="262" width="250" height="52" rx="6"/><text class="t" x="502" y="284">GitHub &#183; ShivaTeja05/physlens</text><text class="s" x="502" y="302">main: normal version &#183; simulator: full</text></g>
+          <path class="a" d="M220,144 H270" marker-start="url(#m4)" marker-end="url(#m4)"/><text class="lb" x="245" y="138" text-anchor="middle">HTTP, WS</text>
+          <path class="a" d="M440,144 H490" marker-end="url(#m4)"/><text class="lb" x="465" y="138" text-anchor="middle">/api</text>
+          <path class="a" d="M740,90 H800" marker-end="url(#m4)"/><text class="lb" x="770" y="84" text-anchor="middle">HTTPS</text>
+          <path class="a" d="M740,200 H800" marker-end="url(#m4)"/><text class="lb" x="770" y="194" text-anchor="middle">frames</text>
+          <path class="a" d="M800,224 H740" marker-end="url(#m4)"/><text class="lb" x="770" y="240" text-anchor="middle">depth</text>
+          <path class="a" d="M490,222 H460 V270 H220" marker-end="url(#m4)"/><text class="lb" x="340" y="264" text-anchor="middle">web_copy.py</text>
+          <path class="a" d="M615,232 V262" marker-start="url(#m4)" marker-end="url(#m4)"/><text class="lb" x="622" y="252">git push</text>
+        </svg>
+      </div>
+      <figcaption><b>One engine, two outside services.</b> The browser never calls Meta AI or RunPod directly: the engine holds the keys, caches every expensive result, and enforces the spend cap. The GPU worker scales to zero between jobs; the shared link is a static copy that needs neither.</figcaption>
+    </figure>
+  </section>
+
+  <section id="checked">
+    <h2><small>CHECKED</small>What the pipeline gets right, and where it fails</h2>
+    <div class="tbl">
+      <table>
+        <thead><tr><th>Event</th><th>Measured</th><th>Ground truth</th></tr></thead>
+        <tbody>
+          <tr><td>Frontal crash, 1,000 fps (NHTSA 9070)</td><td><b>56.81 km/h</b>; crush 0.728 m at 75 ms; curve within 1.5 cm</td><td>56.55 km/h; 0.707 m at 74.1 ms (accelerometers)</td></tr>
+          <tr><td>Side pole crash, overhead (NHTSA 15756)</td><td><b>31.29 km/h</b> at 74.6&#176; to the car's axis</td><td>31.09 km/h at 75&#176;</td></tr>
+          <tr><td>Truck under the 11foot8 bridge</td><td>impact at frame 196.6; clearance 3.63 m</td><td>hand label 196&#8211;200; sign 3.556 m</td></tr>
+          <tr><td>Fast motion from per-frame AI depth (NHTSA 9001)</td><td>cart 25&#8211;33 km/h &#10007;</td><td>62.19 km/h: blur, occlusion and lens errors</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="note">Full list, scripts and reasons in <code>benchmark/EVENTS.md</code>. All footage is public (NHTSA, NASA, Wikimedia Commons).</p>
+  </section>
+</div>
