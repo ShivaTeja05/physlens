@@ -24,6 +24,9 @@ All footage is public (NHTSA, NASA, Wikimedia Commons; see each `datasets/*/SOUR
 | NHTSA 7371: Yaris at 113 km/h into a standing Yaris, 15°, both turning (in progress) | overhead wide, 1,000 fps (`yaris7371.py`, rigid bodies that turn) | approach 99.8 km/h (lens from floor seams, k1 −0.12) / 104.0 (no lens fix); 17 frames at the picture's edge | 113.0 km/h | `yaris7371.py` |
 | | | struck car's speed change in its own axes at 100 / 150 ms: X −51.6 / −46.6, Y +16.2 / +18.5 (k1 −0.12); X −59.2 / −57.4, Y +18.1 / +21.8 (no fix) | X −58.4 / −57.5, Y +22.9 / +19.9 (accelerometers) | |
 | | | not yet reliable: the lens can't be calibrated from this floor's seams (line by line k1 −0.40 to +0.34) | | |
+| NHTSA 10072: moving barrier (2,437 kg) into a standing Nissan Altima, 15°, 35% overlap | barrier overhead, 28 mm, 1,000 fps (`omdb10072.py`) | approach **90.72 km/h** (scale from the face's photo targets, 450 mm apart) | 90.33 km/h (speed trap) | `omdb10072.py` |
+| | | barrier's speed change in its own axes, 10 / 20 / 30 / 40 ms: −2.2 / −7.7 / −13.6 / −19.9 km/h | −2.7 / −8.3 / −14.5 / −21.5 (accelerometer) | |
+| | | after 50 ms not resolved: video −27 to −48 km/h, sensor levels at −26.5; the barrier pitches and turns, and this test's car accelerometers are already unusable | | |
 | NHTSA 9001: barrier cart into a parked Camry | real-time rear view, 30 fps | parked Camry 4.54–4.78 m (lens range); Muse Spark: Camry, 4.869 m | 4.85 m | `side9001_3d.py` |
 | | | cart 25–33 km/h ✗ | 62.19 km/h | |
 
@@ -42,6 +45,10 @@ All footage is public (NHTSA, NASA, Wikimedia Commons; see each `datasets/*/SOUR
 - **Yaris (7371) scale and lens**: MoGe-3's points of the struck car give widths of 1.45–1.78 m depending on the
   part and a length 9% short of its width scale; its field of view changes 71–78° between frames; the floor's seams
   give k1 −0.40 to +0.34 line by line. Neither the scale nor the lens can be pinned from this footage yet.
+
+- **Per-feature heights on an open frame** (10072's truss): the floor shows through it, and the barrier appeared
+  to turn 3.6° on its straight guide before impact. One plane at the truss's median turned it least, so that was
+  used: a rule from physics (it can't turn before impact), not from the answer.
 
 ## What made the hybrid work
 - **Lens from straight floor lines** when the motion covers only part of the picture (8555: the physics fit sat at
