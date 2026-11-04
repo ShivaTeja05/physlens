@@ -387,3 +387,12 @@ header { padding-top: 12px; padding-bottom: 12px; }
 .pw-face-pct { text-align: right; font-variant-numeric: tabular-nums; }
 .pw-pred-key { color: #b49bff; font-weight: 600; }
 .pw-prior { font-size: 13px; line-height: 1.45; }
+.pw-chart-wrap { display: grid; gap: 4px; margin: 6px 0; max-width: 520px; }
+.pw-chart { width: 100%; height: auto; }
+.pw-chart text { fill: var(--muted); font-size: 10px; font-variant-numeric: tabular-nums; }
+.pw-chart .grid { stroke: var(--line); stroke-width: 1; }
+.pw-chart .sensor { fill: none; stroke: #8fe3a0; stroke-width: 2; }
+.pw-chart .video { fill: none; stroke: var(--accent); stroke-width: 1.2; opacity: 0.6; }
+.pw-chart .video-dot { fill: var(--accent); }
+.pw-key-video { color: var(--accent); font-weight: 600; }
+.pw-key-sensor { color: #8fe3a0; font-weight: 600; }

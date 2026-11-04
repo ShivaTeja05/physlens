@@ -224,6 +224,32 @@ function poseAt(poses: Pose[], t: number): { x: number; y: number; z: number; ya
   return { x: a.x! + f * (b.x! - a.x!), y: a.y! + f * (b.y! - a.y!), z: a.z! + f * (b.z! - a.z!), yaw: a.yaw! + f * dy }
 }
 
+/** The rear section's travel since impact, from the 3D points and from the car's own accelerometers. */
+function CrushChart({ c }: { c: { t_ms: number[]; video_m: (number | null)[]; sensor_t_ms: number[]; sensor_m: number[] } }) {
+  const W = 460, H = 180, L = 44, B = 28, T = 10, R = 10
+  const pts = c.t_ms.map((t, i) => [t, c.video_m[i]] as [number, number | null]).filter((p): p is [number, number] => p[1] !== null && p[0] >= 0)
+  const sen = c.sensor_t_ms.map((t, i) => [t, c.sensor_m[i]] as [number, number]).filter((p) => p[0] >= 0)
+  const tMax = Math.max(...sen.map((p) => p[0]), ...pts.map((p) => p[0]), 1)
+  const yMax = Math.max(0.8, ...pts.map((p) => p[1]), ...sen.map((p) => p[1])) * 1.05
+  const yMin = Math.min(0, ...pts.map((p) => p[1]))
+  const X = (t: number) => L + (t / tMax) * (W - L - R)
+  const Y = (v: number) => T + (1 - (v - yMin) / (yMax - yMin)) * (H - T - B)
+  const path = (a: [number, number][]) => a.map((p, i) => `${i ? 'L' : 'M'}${X(p[0]).toFixed(1)},${Y(p[1]).toFixed(1)}`).join('')
+  const yTicks = [0, 0.2, 0.4, 0.6, 0.8].filter((v) => v <= yMax && v >= yMin)
+  const tTicks = [0, 50, 100, 150, 200, 250, 300].filter((t) => t <= tMax)
+  return (
+    <svg className="pw-chart" viewBox={`0 0 ${W} ${H}`} role="img" aria-label="Rear travel since impact: 3D points vs accelerometers">
+      {yTicks.map((v) => <g key={v}><line x1={L} x2={W - R} y1={Y(v)} y2={Y(v)} className="grid" /><text x={L - 6} y={Y(v) + 4} textAnchor="end">{v.toFixed(1)}</text></g>)}
+      {tTicks.map((t) => <text key={t} x={X(t)} y={H - 10} textAnchor="middle">{t}</text>)}
+      <text x={W - R} y={H - 10} textAnchor="end" className="unit">ms after impact</text>
+      <text x={L - 6} y={T + 2} textAnchor="end" className="unit">m</text>
+      <path d={path(sen)} className="sensor" />
+      <path d={path(pts)} className="video" />
+      {pts.map((p, i) => <circle key={i} cx={X(p[0])} cy={Y(p[1])} r={2.2} className="video-dot" />)}
+    </svg>
+  )
+}
+
 const FACE_NAMES: Record<string, string> = { front: 'Front', rear: 'Rear', left: 'Left side', right: 'Right side', top: 'Top' }
 
 type Props = { base?: string; initial?: string; standalone?: boolean }
@@ -498,6 +524,13 @@ export default function PointWorld({ base = '/media/pointworld/', initial, stand
             {notes.height_check && <div>Height check: measured {notes.height_check.measured_height_m.toFixed(2)} m vs clearance {notes.height_check.clearance_m.toFixed(2)} m · {notes.height_check.verdict === 'height reads low'
               ? <>it hit anyway, so it is at least {notes.height_check.true_height_at_least_m} m tall: <b className="pw-warn">our height reads ≥{Math.round(notes.height_check.measured_low_by_at_least_pct)}% low here</b> (roof seen edge-on)</>
               : notes.height_check.verdict}</div>}
+            {notes.crush_curve && (
+              <div className="pw-chart-wrap">
+                <div className="pw-events-title">Crush: how far the car's rear kept moving after impact</div>
+                <CrushChart c={notes.crush_curve} />
+                <div className="pw-note"><span className="pw-key-video">dots</span>: the rigid rear section tracked in the 1,000 fps camera's 3D points · <span className="pw-key-sensor">line</span>: NHTSA's rear-floor accelerometers, integrated</div>
+              </div>
+            )}
             {notes.truth_table && (
               <table className="pw-truth">
                 <thead><tr><th></th><th>3D world</th><th>Ground truth</th></tr></thead>

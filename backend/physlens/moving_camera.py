@@ -131,7 +131,8 @@ def _plane_ransac(P: np.ndarray, thresh: float, iters: int = 400, seed: int = 0)
 
 def floor_frame(views, key_poses: list[np.ndarray]) -> tuple[np.ndarray, dict]:
     """World(MapAnything) → floor frame: y up along the floor normal, height 0 on the floor, x along the first
-    camera's right. Two largest planes are found; the floor is the one whose normal is closest to the cameras' up."""
+    camera's right. Two largest planes are found; the floor is the one whose normal is closest to the cameras' up
+    (more planes are searched when neither is close to level)."""
     pts = []
     for v in views:
         P = v.points_world[::6, ::6].reshape(-1, 3)
@@ -151,6 +152,28 @@ def floor_frame(views, key_poses: list[np.ndarray]) -> tuple[np.ndarray, dict]:
         planes.append((nrm, c, int(inl.sum())))
         rest = rest[~inl]
     nrm, c, count = max(planes, key=lambda p: abs(p[0] @ cam_up))
+    # When a large object or a wall fills the view, the floor may not be among the two largest planes: keep
+    # looking (up to six planes).
+    if abs(nrm @ cam_up) < np.cos(np.radians(10)):
+        for _ in range(4):
+            if len(rest) < 500:
+                break
+            n2, c2, inl = _plane_ransac(rest, thresh)
+            planes.append((n2, c2, int(inl.sum())))
+            rest = rest[~inl]
+        # The floor is level and BELOW the cameras (a ceiling or light grid is level too, above them): among the
+        # level planes with a fair share of points, the lowest one.
+        cam_c = np.mean([p[:3, 3] for p in key_poses], axis=0)
+        level = []
+        for n2, c2, k2 in planes:
+            if abs(n2 @ cam_up) > np.cos(np.radians(35)):
+                n2 = n2 if n2 @ cam_up > 0 else -n2
+                height = float((cam_c - c2) @ n2)
+                if height > 0.1 * depth_scale:
+                    level.append((n2, c2, k2, height))
+        if level:
+            big = max(p[2] for p in level)
+            nrm, c, count, _ = max([p for p in level if p[2] >= 0.2 * big], key=lambda p: p[3])
     if nrm @ cam_up < 0:
         nrm = -nrm
     x = key_poses[0][:3, 0] - (key_poses[0][:3, 0] @ nrm) * nrm
