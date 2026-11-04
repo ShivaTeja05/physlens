@@ -15,14 +15,28 @@ type Header = {
   upsample: number; density_note: string; origin: [number, number, number]; step: [number, number, number]
   groups: Group[]; object: string; boxes: Box[]; object_size_median_m: { length: number; height: number; width: number }
   camera: { position: [number, number, number]; forward: [number, number, number]; fov_deg: number; moving: boolean }
-  scale_from: string; notes: Record<string, unknown>; decimated_from?: number
+  scale_from: string; notes: Record<string, unknown>; decimated_from?: number; bin_parts?: string[]; bin_bytes?: number
 }
 type Loaded = { header: Header; positions: Float32Array; colours: Uint8Array }
 
 async function load(base: string, name: string): Promise<Loaded> {
   // The header is small and gains notes (events, checks) after export: always revalidated.
   const header: Header = await (await fetch(`${base}${name}.json`, { cache: 'no-cache' })).json()
-  const buf = await (await fetch(`${base}${name}.bin`)).arrayBuffer()
+  // The points: one binary file from the engine, or base64 text parts in a static shared copy
+  // (benchmark/web_copy.py; artifact hosting serves text, not raw binary).
+  let buf: ArrayBuffer
+  if (header.bin_parts) {
+    const bytes = new Uint8Array(header.bin_bytes ?? 0)
+    let at = 0, carry = ''
+    for (const p of header.bin_parts) {
+      const text = carry + (await (await fetch(`${base}${p}`)).text())
+      const whole = text.length - (text.length % 4)
+      const bin = atob(text.slice(0, whole))
+      carry = text.slice(whole)
+      for (let i = 0; i < bin.length; i++) bytes[at++] = bin.charCodeAt(i)
+    }
+    buf = bytes.buffer
+  } else buf = await (await fetch(`${base}${name}.bin`)).arrayBuffer()
   const n = header.points
   const q = new Int16Array(buf, 0, n * 3)
   const colours = new Uint8Array(buf, n * 6, n * 3)
@@ -89,6 +103,22 @@ function StructureLine({ s, hot }: { s: Structure; hot: boolean }) {
     <>
       <Line points={[s.from, s.to]} color={hot ? '#ff4d4d' : '#ffe14d'} lineWidth={hot ? 6 : 3} />
       <Html position={mid} center className={`pw-label ${hot ? 'pw-hot' : ''}`}>{hot ? 'IMPACT · ' : ''}{s.label}</Html>
+    </>
+  )
+}
+
+/** A camera that filmed this world (several when cameras are merged into one world), as a small pyramid. */
+type Cam = { name: string; position: [number, number, number]; forward: [number, number, number]; fov_deg?: number }
+function CameraMarker({ c }: { c: Cam }) {
+  const p = new THREE.Vector3(...c.position), f = new THREE.Vector3(...c.forward).normalize()
+  const up = new THREE.Vector3(0, 1, 0), r = new THREE.Vector3().crossVectors(f, up).normalize(), u = new THREE.Vector3().crossVectors(r, f)
+  const tip = (sx: number, sy: number) => p.clone().addScaledVector(f, 0.8).addScaledVector(r, sx * 0.45).addScaledVector(u, sy * 0.28).toArray() as [number, number, number]
+  const P = p.toArray() as [number, number, number]
+  const a = tip(-1, -1), b = tip(1, -1), cc = tip(1, 1), d = tip(-1, 1)
+  return (
+    <>
+      <Line points={[P, a, b, P, cc, d, P, a, d, a, b, cc]} color="#9b8cff" lineWidth={1.5} />
+      <Html position={[P[0], P[1] + 0.4, P[2]]} center className="pw-label">{c.name}</Html>
     </>
   )
 }
@@ -279,6 +309,7 @@ export default function PointWorld({ base = '/media/pointworld/', initial, stand
             {box && !(rigid && rigidNow) && <SizeBox box={box} label={h.object} />}
             {rigid && rigidNow && <RigidBox r={rigidNow} hot={hot} />}
             {structures.map((s) => <StructureLine key={s.name} s={s} hot={hot} />)}
+            {((notes.cameras ?? []) as Cam[]).map((c) => <CameraMarker key={c.name} c={c} />)}
             <gridHelper args={[60, 60, '#1d3b4f', '#0f1d28']} />
           </Canvas>
         )}

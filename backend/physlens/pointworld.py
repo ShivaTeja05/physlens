@@ -161,6 +161,26 @@ def export(name: str, title: str, video: Path, tr: Track3D, views, masks: list, 
         groups.append({"tag": len(boxes), "frame": f, "t": round(f / fps, 4), "start": start, "count": int(len(cloud))})
         start += len(cloud)
         boxes.append({"frame": f, "t": round(f / fps, 4), "points": int(len(cloud)), **oriented_box(cloud, heads[k])})
+    cam = views[0].camera_pose
+    cam_pos = (T[:3, :3] @ cam[:3, 3] + T[:3, 3]) * s
+    fwd = T[:3, :3] @ cam[:3, 2]
+    camera = {"position": cam_pos.round(3).tolist(), "forward": fwd.round(4).tolist(),
+              "fov_deg": round(float(np.degrees(2 * np.arctan(views[0].depth.shape[0] / 2 / views[0].intrinsics[1, 1]))), 1),
+              "moving": moving_camera}
+    meta = {"video": str(video.name), "fps": fps, "upsample": 1 if sharp is not None else upsample,
+            "depth_source": "MoGe-3 at full resolution, aligned to MapAnything" if sharp is not None else "MapAnything (518 px)",
+            "density_note": ("one measured point per video pixel (MoGe-3 depth, fitted to MapAnything's scale and poses)"
+                             if sharp is not None else
+                             f"{upsample}× denser than measured: in-between points are interpolated, not new measurements"
+                             if upsample > 1 else "one point per measured pixel"),
+            "scale_from": tr.info.get("scale_from", "MapAnything")}
+    return write_world(name, title, P_out, C_out, tags, groups, boxes, out_dir, object_label, camera, meta, notes)
+
+
+def write_world(name: str, title: str, P_out: list, C_out: list, tags: list, groups: list, boxes: list, out_dir: Path,
+                object_label: str, camera: dict, meta: dict, notes: dict | None = None) -> dict:
+    """Write a point world (format physlens-pointworld/1): the static points first (group tag 255), then each
+    moment of the object as its own group, positions quantised to int16 over the world's extent."""
     P = np.concatenate(P_out).astype(np.float64)
     C = np.concatenate(C_out).astype(np.uint8)
     tag = np.concatenate(tags)
@@ -172,27 +192,15 @@ def export(name: str, title: str, video: Path, tr: Track3D, views, masks: list, 
     with open(out_dir / f"{name}.bin", "wb") as fh:
         fh.write(q.astype("<i2").tobytes()); fh.write(C.tobytes()); fh.write(tag.tobytes())
 
-    cam = views[0].camera_pose
-    cam_pos = (T[:3, :3] @ cam[:3, 3] + T[:3, 3]) * s
-    fwd = T[:3, :3] @ cam[:3, 2]
     sizes = np.array([b["size"] for b in boxes]) if boxes else np.zeros((0, 3))
-    header = {"format": "physlens-pointworld/1", "name": name, "title": title, "video": str(video.name), "fps": fps,
+    header = {"format": "physlens-pointworld/1", "name": name, "title": title, **meta,
               "points": int(len(P)), "static_points": groups[0]["count"], "object_points": int(len(P) - groups[0]["count"]),
-              "upsample": 1 if sharp is not None else upsample,
-              "depth_source": "MoGe-3 at full resolution, aligned to MapAnything" if sharp is not None else "MapAnything (518 px)",
-              "density_note": ("one measured point per video pixel (MoGe-3 depth, fitted to MapAnything's scale and poses)"
-                               if sharp is not None else
-                               f"{upsample}× denser than measured: in-between points are interpolated, not new measurements"
-                               if upsample > 1 else "one point per measured pixel"),
               "origin": (lo + 32500 * step).round(6).tolist(), "step": step.round(9).tolist(),
               "groups": groups, "object": object_label, "boxes": boxes,
               "object_size_median_m": {"length": round(float(np.median(sizes[:, 0])), 2) if len(sizes) else None,
                                        "height": round(float(np.median(sizes[:, 1])), 2) if len(sizes) else None,
                                        "width": round(float(np.median(sizes[:, 2])), 2) if len(sizes) else None},
-              "camera": {"position": cam_pos.round(3).tolist(), "forward": fwd.round(4).tolist(),
-                         "fov_deg": round(float(np.degrees(2 * np.arctan(views[0].depth.shape[0] / 2 / views[0].intrinsics[1, 1]))), 1),
-                         "moving": moving_camera},
-              "scale_from": tr.info.get("scale_from", "MapAnything"), "notes": notes or {}}
+              "camera": camera, "notes": notes or {}}
     (out_dir / f"{name}.json").write_text(json.dumps(header, indent=1))
     index = out_dir / "index.json"
     items = json.loads(index.read_text()) if index.exists() else []

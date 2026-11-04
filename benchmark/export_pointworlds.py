@@ -17,6 +17,11 @@ from physlens.sharp import align, fov_x   # noqa: E402
 import cv2 as _cv2   # noqa: E402
 from physlens.vehicle3d import read_at, rescale, track   # noqa: E402
 
+# Attribution the clips' licences ask for (datasets/commons/SOURCE.md), shown with each world.
+CREDIT = {"truck": "Video: \"Boxtruck carnage on Friday the 13th at the 11foot8 bridge\" by yovo68, Wikimedia Commons, "
+                   "CC BY 3.0 (creativecommons.org/licenses/by/3.0); turned into 3D points.",
+          "rally": "Video: \"Jari-Matti Latvala in Toyota Yaris 10 at Route de la Garde on Thursday\" by Iain Cameron, "
+                   "Wikimedia Commons, CC BY 2.0 (creativecommons.org/licenses/by/2.0); turned into 3D points."}
 CLIPS, CACHE, OUT = ROOT / "datasets" / "commons", ROOT / "records" / "real_cache", ROOT / "media" / "pointworld"
 res = json.loads((ROOT / "benchmark" / "real_vehicles.json").read_text())
 args = [a for a in sys.argv[1:] if not a.startswith("--")]
@@ -73,7 +78,7 @@ for name, vid, idx, prompt, sub, moving, title, label in (
     r = res[name]
     rescale(tr, r["scale"], r["info"]["scale_from"])
     ms = masks_of(CACHE / sub / f"samvideo_{prompt.replace(' ', '_')}", len(idx))
-    notes = {"speeds_kmh": [round(v * 3.6, 1) for v in r["speed_ms"]], "speed_t": r["speed_t"]}
+    notes = {"speeds_kmh": [round(v * 3.6, 1) for v in r["speed_ms"]], "speed_t": r["speed_t"], "credit": CREDIT[name]}
     if name == "truck":
         notes.update({"cruise_kmh": r["cruise_kmh"], "braking_decel_ms2": r["braking_decel_ms2"],
                       "speed_at_contact_kmh": r["speed_at_contact_kmh"], "speed_at_contact_err_kmh": r["speed_at_contact_err_kmh"],

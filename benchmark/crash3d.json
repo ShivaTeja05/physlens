@@ -332,5 +332,6 @@
   ],
   "source": "NHTSA test 9070: speed trap; crush and deceleration from the rear-floorpan accelerometers"
  },
- "scale_from": "MapAnything (metric, no reference used)"
+ "scale_from": "MapAnything (metric, no reference used)",
+ "approach_kmh_car_length_scale": 61.86
 }

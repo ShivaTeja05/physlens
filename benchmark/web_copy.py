@@ -4,6 +4,7 @@ opens anywhere without the engine. Headers keep every note (events, rigid body, 
 the full count.
 Usage: PYTHONPATH=backend backend/.venv/bin/python benchmark/web_copy.py <out_dir> [world ...]
 """
+import base64
 import json
 import re
 import shutil
@@ -42,8 +43,16 @@ def thin(name: str, out: Path) -> dict:
     h2 = {**h, "points": int(len(Q)), "groups": groups, "decimated_from": n,
           "static_points": groups[0]["count"] if groups and groups[0]["tag"] == 255 else 0}
     h2["object_points"] = h2["points"] - h2["static_points"]
+    # Points as base64 text in parts under 12 MB each: artifact hosting serves text and images, not raw binary.
+    raw = Q.astype(np.int16).tobytes() + C.astype(np.uint8).tobytes()
+    b64 = base64.b64encode(raw).decode()
+    part = 12_000_000
+    parts = [f"{name}.{i}.txt" for i in range((len(b64) + part - 1) // part)]
+    for i, fn in enumerate(parts):
+        (out / fn).write_text(b64[i * part:(i + 1) * part])
+    h2["bin_parts"] = parts
+    h2["bin_bytes"] = len(raw)
     (out / f"{name}.json").write_text(json.dumps(h2))
-    (out / f"{name}.bin").write_bytes(Q.astype(np.int16).tobytes() + C.astype(np.uint8).tobytes())
     return {"name": name, "title": h["title"], "points": h2["points"]}
 
 
@@ -52,7 +61,21 @@ if __name__ == "__main__":
     names = sys.argv[2:] or [w["name"] for w in json.loads((PW / "index.json").read_text())]
     dist = ROOT / "web" / "dist"
     out.mkdir(parents=True, exist_ok=True)
-    shutil.copy(dist / "sim.html", out / "index.html")
+    # The page as a fragment (an Artifact wraps it in its own document): the built page's script and stylesheet,
+    # the simulator's root, its title, and its dark look declared.
+    html = (dist / "sim.html").read_text()
+    tags = "\n".join(re.findall(r'<(?:script|link)[^>]*\./assets/[^>]*>(?:</script>)?', html))
+    (out / "index.html").write_text(f"""<title>PhysLens Simulator</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<style>
+  :root {{ color-scheme: dark; --bg: #05070b; --fg: #e9eef5; }}
+  html, body {{ background: var(--bg); color: var(--fg); }}
+  .pw-standalone {{ padding-left: max(16px, env(safe-area-inset-left, 0px)) !important;
+                    padding-right: max(16px, env(safe-area-inset-right, 0px)) !important; }}
+</style>
+{tags}
+<div id="root"></div>
+""")
     # Only the files the simulator page loads (the main app's bundle isn't needed), following imports one level.
     (out / "assets").mkdir(exist_ok=True)
     todo, seen = re.findall(r"\./assets/([\w.-]+)", (dist / "sim.html").read_text()), set()
@@ -69,4 +92,4 @@ if __name__ == "__main__":
     index = [thin(nm, data) for nm in names]
     (data / "index.json").write_text(json.dumps(index))
     for w in index:
-        print(w["name"], f"{w['points']:,} points,", f"{(data / (w['name'] + '.bin')).stat().st_size / 1e6:.1f} MB")
+        print(w["name"], f"{w['points']:,} points,", sorted(p.name for p in data.glob(w["name"] + ".*.txt")))

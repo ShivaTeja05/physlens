@@ -219,12 +219,17 @@ def analyse(tr, frames, views, sd, ms, barrier):
            "t": t.round(4).tolist(), "frames": [IDX[j] for j in ks], "rear_m": rear.round(3).tolist(),
            "front_m": front.round(3).tolist(), "whole": [IDX[ks[i]] for i in whole], "events": events, "truth": TRUTH,
            "scale_from": tr.info.get("scale_from", "MapAnything (metric, no reference used)")}
-    truth_table = [["Impact speed", f"{v_app * 3.6:.1f} ± {v_err * 3.6:.1f} km/h", f"{TRUTH['impact_kmh']} km/h (speed trap)"],
-                   ["Car length (scale check)", f"{L:.2f} m", f"{TRUTH['car_length_m']} m (published)"]]
+    # MapAnything's own metric scale makes the car too long; scaled by the car's published length instead (the
+    # reference the 2D crash lab uses), the speed is a test of the motion alone.
+    k_len = TRUTH["car_length_m"] / L
+    out["approach_kmh_car_length_scale"] = round(v_app * 3.6 * k_len, 2)
+    truth_table = [["Impact speed (AI metric scale)", f"{v_app * 3.6:.1f} ± {v_err * 3.6:.1f} km/h", f"{TRUTH['impact_kmh']} km/h (speed trap)"],
+                   ["Impact speed (scaled by car length)", f"{v_app * 3.6 * k_len:.1f} km/h", f"{TRUTH['impact_kmh']} km/h"],
+                   ["Car length (AI metric scale)", f"{L:.2f} m", f"{TRUTH['car_length_m']} m (published)"]]
     if crush:
-        truth_table.append(["Largest crush", f"{crush['max_crush_m']:.2f} m", f"{TRUTH['crush_m']} m (accelerometers)"])
+        truth_table.append(["Largest crush (scaled by car length)", f"{crush['max_crush_m'] * k_len:.2f} m", f"{TRUTH['crush_m']} m (accelerometers)"])
     if reb is not None:
-        truth_table.append(["Rebound", f"{reb:.1f} m/s", f"{TRUTH['rebound_ms'][0]}–{TRUTH['rebound_ms'][1]} m/s"])
+        truth_table.append(["Rebound (scaled by car length)", f"{reb * k_len:.1f} m/s", f"{TRUTH['rebound_ms'][0]}–{TRUTH['rebound_ms'][1]} m/s"])
     return out, {"events": events, "rigid": rigid, "structures": structures, "rigid_body": body.as_dict() if body else None,
                  "truth_table": truth_table, "truth": TRUTH, "speeds_kmh": [], "credit": "Video: NHTSA crash test 9070, camera 15 (public)."}
 
