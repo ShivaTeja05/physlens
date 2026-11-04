@@ -8,7 +8,7 @@ Three stages, each on its own:
                one body of real points along the measured poses: no box, no drawn shape.
   3. analyse   where information is missing (`coverage`): for each side of the body, how much of it has points
                and from how many frames; a side no frame saw stays empty and is reported, never filled in.
-Body coordinates: x forward (direction of travel), y up, z to the left; origin on the ground under the body's
+Body coordinates: x forward (direction of travel), y up, z to the right (x × y in a right-handed, y-up frame); origin on the ground under the body's
 centre. A pose maps body → world (ground frame): world = R(yaw) · body + (x, y, z).
 """
 from __future__ import annotations
@@ -187,7 +187,9 @@ def _rot_reg(yaw: float) -> np.ndarray:
     return np.array([[c, 0, s], [0, 1, 0], [-s, 0, c]])
 
 
-FACES = {"front": (0, +1), "rear": (0, -1), "left": (2, +1), "right": (2, -1), "top": (1, +1)}
+# Body z points right: with x forward and y up in a right-handed frame, x × y = z is the right-hand side
+# (checked against NHTSA's camera names: cam15, "Real-Time Left Overall", sees the car's −z side).
+FACES = {"front": (0, +1), "rear": (0, -1), "left": (2, -1), "right": (2, +1), "top": (1, +1)}
 
 
 def coverage(body: Body, frames_of: np.ndarray | None = None, cell: float = 0.1, shell: float = 0.25) -> dict:

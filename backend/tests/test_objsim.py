@@ -31,7 +31,7 @@ def test_poses_and_missing_side():
         c, s = np.cos(yaw), np.sin(yaw)
         R = np.array([[c, 0, -s], [0, 1, 0], [s, 0, c]])
         W = body @ R.T + pos
-        # The camera sees the side facing it (+z) and the top: the far side (−z) never.
+        # The camera sees the side facing it (+z, the body's right) and the top: the far side (−z) never.
         normal_z = (body[:, 2] > 0.85) | (body[:, 1] > 1.45) | (np.abs(body[:, 0]) > 1.95)
         vis = normal_z & (W[:, 0] - pos[0] < 2.0 + (k % 3))     # plus a varying cut, as if partly out of view
         clouds.append(W[vis]); cols.append(np.full((vis.sum(), 3), 200, np.uint8))
@@ -48,4 +48,5 @@ def test_poses_and_missing_side():
         assert abs((q["yaw"] - p["yaw"]) - (truth[j][1] - truth[k][1])) < np.radians(1.0)
     cov = coverage(b)
     assert abs(cov["size_m"]["length"] - 4.0) < 0.15
-    assert "right" in cov["never_seen"] and "left" not in cov["never_seen"]
+    # The camera sees +z, the body's right (x forward, y up); the left (−z) is never seen.
+    assert "left" in cov["never_seen"] and "right" not in cov["never_seen"]

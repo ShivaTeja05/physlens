@@ -108,7 +108,7 @@ def predict(name, cfg, body, cov, h):
     hidden = [f for f in ("left", "right") if f in cov["never_seen"]]
     if hidden and prior.get("width_m") and k:
         w = prior["width_m"] / k                          # the published width in this world's units
-        if hidden[0] == "left":                           # seen side at −z
+        if hidden[0] == "right":                          # hidden at +z: the seen (left) side is at −z
             near = float(np.percentile(P[:, 2], 2))
             plane = near + w / 2
             seen = P[:, 2] < plane

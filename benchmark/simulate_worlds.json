@@ -6,19 +6,19 @@
   ],
   "rigid_until_t": 1.4681,
   "after_rigid": "the front crushes against the barrier",
-  "points": 58010,
+  "points": 58033,
   "frames_used": 9,
   "frames": 9,
   "passes": [
    {
     "pass": 1,
     "frames_used": 9,
-    "points": 58973
+    "points": 58978
    },
    {
     "pass": 2,
     "frames_used": 9,
-    "points": 58929,
+    "points": 58945,
     "largest_move_m": 0.0053
    }
   ],
@@ -28,40 +28,40 @@
      "covered_pct": 57.7,
      "area_m2": 1.05,
      "most_frames_on_a_spot": 5,
-     "points": 5084
+     "points": 5088
     },
     "rear": {
      "covered_pct": 14.8,
      "area_m2": 0.27,
      "most_frames_on_a_spot": 4,
-     "points": 1720
+     "points": 1719
     },
     "left": {
-     "covered_pct": 7.1,
-     "area_m2": 0.44,
-     "most_frames_on_a_spot": 4,
-     "points": 2092
-    },
-    "right": {
      "covered_pct": 73.2,
      "area_m2": 4.51,
      "most_frames_on_a_spot": 8,
-     "points": 23742
+     "points": 23746
+    },
+    "right": {
+     "covered_pct": 7.1,
+     "area_m2": 0.44,
+     "most_frames_on_a_spot": 4,
+     "points": 2094
     },
     "top": {
      "covered_pct": 46.3,
      "area_m2": 2.65,
      "most_frames_on_a_spot": 7,
-     "points": 6721
+     "points": 6711
     }
    },
    "never_seen": [
-    "left"
+    "right"
    ],
    "size_m": {
     "length": 4.956,
     "height": 1.949,
-    "width": 1.814
+    "width": 1.813
    }
   },
   "seen_max": 8,
@@ -92,11 +92,11 @@
    "kmh_prior_scale": 60.11
   },
   "predicted_side": {
-   "side": "left",
-   "points": 47236,
+   "side": "right",
+   "points": 47261,
    "mirror_plane_z": 0.288,
    "width_used_m": 1.92,
-   "real_points_beyond_far_side_dropped": 1039,
+   "real_points_beyond_far_side_dropped": 1040,
    "how": "mirror symmetry about the car's centre plane, placed half the identified model's published width in from the seen side"
   },
   "truth_rows": [
@@ -175,16 +175,16 @@
      "points": 1965
     },
     "left": {
-     "covered_pct": 22.0,
-     "area_m2": 0.8,
-     "most_frames_on_a_spot": 4,
-     "points": 3475
-    },
-    "right": {
      "covered_pct": 9.4,
      "area_m2": 0.34,
      "most_frames_on_a_spot": 3,
      "points": 2370
+    },
+    "right": {
+     "covered_pct": 22.0,
+     "area_m2": 0.8,
+     "most_frames_on_a_spot": 4,
+     "points": 3475
     },
     "top": {
      "covered_pct": 48.2,
@@ -194,7 +194,7 @@
     }
    },
    "never_seen": [
-    "right"
+    "left"
    ],
    "size_m": {
     "length": 3.878,
@@ -229,7 +229,7 @@
    "kmh_prior_scale": 134.72
   },
   "predicted_side": {
-   "side": "right",
+   "side": "left",
    "points": 23899,
    "mirror_plane_z": -0.062,
    "width_used_m": 1.779,
@@ -266,20 +266,20 @@
   ],
   "rigid_until_t": 6.5399,
   "after_rigid": "the roof is torn open at the beam",
-  "points": 230650,
+  "points": 230646,
   "frames_used": 21,
   "frames": 21,
   "passes": [
    {
     "pass": 1,
     "frames_used": 21,
-    "points": 228741
+    "points": 228746
    },
    {
     "pass": 2,
     "frames_used": 21,
-    "points": 228179,
-    "largest_move_m": 0.0088
+    "points": 228173,
+    "largest_move_m": 0.0087
    }
   ],
   "coverage": {
@@ -288,31 +288,31 @@
      "covered_pct": 4.1,
      "area_m2": 0.18,
      "most_frames_on_a_spot": 5,
-     "points": 2038
+     "points": 2041
     },
     "rear": {
      "covered_pct": 100.0,
      "area_m2": 4.42,
      "most_frames_on_a_spot": 11,
-     "points": 41653
+     "points": 41646
     },
     "left": {
-     "covered_pct": 98.4,
-     "area_m2": 22.01,
-     "most_frames_on_a_spot": 18,
-     "points": 80774
-    },
-    "right": {
      "covered_pct": 10.1,
      "area_m2": 2.26,
      "most_frames_on_a_spot": 10,
-     "points": 14462
+     "points": 14453
+    },
+    "right": {
+     "covered_pct": 98.4,
+     "area_m2": 22.01,
+     "most_frames_on_a_spot": 18,
+     "points": 80784
     },
     "top": {
      "covered_pct": 97.1,
      "area_m2": 14.19,
      "most_frames_on_a_spot": 7,
-     "points": 41451
+     "points": 41450
     }
    },
    "never_seen": [
