@@ -1,0 +1,13 @@
+{
+ "kind": "car",
+ "make": "Toyota",
+ "model": "Camry",
+ "years": "2015-2017",
+ "length_m": 4.869,
+ "width_m": 1.821,
+ "height_m": 1.466,
+ "text_read": "",
+ "confidence": "medium",
+ "why": "midsize sedan side profile, window/greenhouse shape, headlight and taillight shape and rear badging area match XV50 facelift US Toyota Camry crash-test vehicle; calibration dots/tape indicate IIHS/NHTSA side test",
+ "source": "Muse Spark (muse-spark-1.3), published dimensions: predicted from knowledge, not measured"
+}
