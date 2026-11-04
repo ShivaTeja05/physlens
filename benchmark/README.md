@@ -1,4 +1,23 @@
-# Memory vs eyes benchmark
+# Benchmarks
+
+Every claim in the project traces to a script here and its `.json` result. Each script's docstring says what it
+measures, what it needs and how to run it (`PYTHONPATH=backend backend/.venv/bin/python benchmark/<script>.py`).
+
+| Write-up | What it covers | Main scripts |
+|---|---|---|
+| [EVENTS.md](EVENTS.md) | **Start here.** Every crash test measured vs official numbers, and what failed | `hybrid_9070.py`, `pole15756.py`, `rear8555.py`, `omdb10072.py`, `yaris7371.py`, `world_events.py` |
+| [CRASH.md](CRASH.md) | The first crash reconstruction (NHTSA 9070, 30 fps side camera) | `crash3d.py`, `side_impact_9001.py` |
+| [REAL_VEHICLES.md](REAL_VEHICLES.md) | Real footage as 3D point worlds (truck, rally car) | `real_vehicles.py`, `export_pointworlds.py` |
+| [SHARP_POINTS.md](SHARP_POINTS.md) | Full-resolution MoGe-3 depth, SAM 3.1 tracking, sizes | `sharp_measure.py` |
+| [MOVING_CAMERA.md](MOVING_CAMERA.md) | Physics when the camera itself moves | `moving_camera_eval.py` |
+| [GEOMETRY.md](GEOMETRY.md) | Measuring static things in metres (MapAnything) | `geometry_m1.py`, `objectron_m1.py` |
+| [RESULTS.md](RESULTS.md) | Memory vs eyes: results table (below: the method) | `run_benchmark.py` |
+
+Simulator worlds: `crash3d.py --export`, `pole_world.py`, `simulate_worlds.py`, `explain_worlds.py`, `web_copy.py`.
+Helpers: `nhtsa_sensors.py` (NHTSA accelerometer files), `prepare_cache.py` (depth and outline caches);
+footage: `scripts/fetch_datasets.py`.
+
+## Memory vs eyes benchmark
 
 **Question:** does an AI answer physics questions from what it *sees* in a video, or from what it *remembers*?
 

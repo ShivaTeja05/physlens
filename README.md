@@ -75,6 +75,8 @@ datasets/, records/, media/   not in git: downloaded footage, caches, generated 
 ```
 
 ## Data and credits
-All footage is public: NHTSA Vehicle Crash Test Database (public, credited, not redistributed here), NASA (public
-domain), Wikimedia Commons (CC BY, credited in each `datasets/*/SOURCE.md`). Models: SAM 3.1 and Muse Spark/Voice
+All footage is public: NHTSA Vehicle Crash Test Database (public, credited; downloaded by
+`scripts/fetch_datasets.py`, except one camera-15 clip of test 9070 that ships in `samples/` for the Lab's crash
+demo), NASA (public domain), Wikimedia Commons (CC BY, credited in each `datasets/*/SOURCE.md`), and a ComPADRE
+classroom clip (CC BY 3.0, `real_clips/compadre-bouncing-ball/SOURCE.md`). Models: SAM 3.1 and Muse Spark/Voice
 (Meta Model API), MapAnything (Meta, Apache-2.0 checkpoint), MoGe-3 (Microsoft, MIT).

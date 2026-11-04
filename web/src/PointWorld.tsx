@@ -18,6 +18,20 @@ type Header = {
   scale_from: string; notes: Record<string, unknown>; decimated_from?: number; bin_parts?: string[]; bin_bytes?: number
 }
 type Loaded = { header: Header; positions: Float32Array; colours: Uint8Array }
+type Size3 = { length: number; width: number; height: number }
+type CrushCurve = { t_ms: number[]; video_m: (number | null)[]; sensor_t_ms: number[]; sensor_m: number[] }
+/** The world's notes, as the engine writes them (benchmark/*.py, physlens/pointworld.py): every field is optional. */
+type Notes = {
+  events?: WorldEvent[]; rigid?: Rigid[]; structures?: Structure[]; cameras?: Cam[]; body?: BodyNote
+  speed_curve?: { t: number[]; kmh: number[]; err_kmh: number[] }; speeds_kmh?: (number | string)[]
+  speed_kmh_median?: number; speed_kmh_range?: number[]; explanation?: string; credit?: string; check?: string
+  rigid_body?: { length: number }; fused_size_m?: Size3; fused_from?: string; true_size_m?: Size3; beam_clearance_m?: number
+  height_check?: { measured_height_m: number; clearance_m: number; verdict: string; true_height_at_least_m: number
+                   measured_low_by_at_least_pct: number }
+  crush_curve?: CrushCurve; truth_table?: [string, string, string][]
+}
+/** What the scene's camera controls (drei's OrbitControls) need to expose here. */
+type Controls = { target: THREE.Vector3; update: () => void }
 
 async function load(base: string, name: string): Promise<Loaded> {
   // The header is small and gains notes (events, checks) after export: always revalidated.
@@ -138,7 +152,7 @@ function pathCentre(h: Header): THREE.Vector3 {
 
 /** Where the key event happened: the structure it hit, else the whole body at that moment. */
 function eventFocus(h: Header): { target: THREE.Vector3; along: THREE.Vector3; across: THREE.Vector3 } | null {
-  const n = h.notes as Record<string, any>
+  const n = h.notes as Notes
   const ev = ((n.events ?? []) as WorldEvent[]).find((e) => e.kind === 'contact' || e.kind === 'impact')
   if (!ev) return null
   const rig = ((n.rigid ?? []) as Rigid[]).reduce<Rigid | null>((b, r) => (!b || Math.abs(r.t - ev.t) < Math.abs(b.t - ev.t) ? r : b), null)
@@ -156,7 +170,7 @@ function eventFocus(h: Header): { target: THREE.Vector3; along: THREE.Vector3; a
 
 /** Camera view: where the real camera stood, looking the way it looked. Top and side: around the object's path.
  *  Event: a close-up across the place the key event happened. */
-function ViewSetter({ header, controls, view }: { header: Header; controls: React.RefObject<any>; view: View }) {
+function ViewSetter({ header, controls, view }: { header: Header; controls: React.RefObject<Controls | null>; view: View }) {
   const { camera } = useThree()
   useEffect(() => {
     const focus = view === 'event' ? eventFocus(header) : null
@@ -225,7 +239,7 @@ function poseAt(poses: Pose[], t: number): { x: number; y: number; z: number; ya
 }
 
 /** The rear section's travel since impact, from the 3D points and from the car's own accelerometers. */
-function CrushChart({ c }: { c: { t_ms: number[]; video_m: (number | null)[]; sensor_t_ms: number[]; sensor_m: number[] } }) {
+function CrushChart({ c }: { c: CrushCurve }) {
   const W = 460, H = 180, L = 44, B = 28, T = 10, R = 10
   const pts = c.t_ms.map((t, i) => [t, c.video_m[i]] as [number, number | null]).filter((p): p is [number, number] => p[1] !== null && p[0] >= 0)
   const sen = c.sensor_t_ms.map((t, i) => [t, c.sensor_m[i]] as [number, number]).filter((p) => p[0] >= 0)
@@ -274,12 +288,12 @@ export default function PointWorld({ base = '/media/pointworld/', initial, stand
   const [tSim, setTSim] = useState(0)
   const [rate, setRate] = useState(0.5)
   const [showPred, setShowPred] = useState(true)
-  const controls = useRef<any>(null)
+  const controls = useRef<Controls | null>(null)
 
   useEffect(() => {
     fetch(`${base}index.json`).then((r) => r.json()).then((w) => {
       setWorlds(w)
-      if (!name && w.length) setName(w[0].name)
+      if (w.length) setName((cur) => cur || w[0].name)                   // keep a world already picked
     }).catch(() => setWorlds([]))
   }, [base])
   useEffect(() => {
@@ -319,7 +333,7 @@ export default function PointWorld({ base = '/media/pointworld/', initial, stand
   }, [playing, objectGroups.length, sim, rate, tFirst, tLast])
 
   const h = data?.header
-  const notes = (h?.notes ?? {}) as Record<string, any>
+  const notes = (h?.notes ?? {}) as Notes
   const bodyNote = notes.body as BodyNote | undefined
   const indexAt = (t: number) => {
     let best = 0
@@ -394,7 +408,8 @@ export default function PointWorld({ base = '/media/pointworld/', initial, stand
         {data && h && (
           <Canvas camera={{ near: 0.05, far: 500 }} gl={{ antialias: false }} style={{ background: '#05070c' }}>
             <ViewSetter header={h} controls={controls} view={view} />
-            <OrbitControls ref={controls} makeDefault enableDamping />
+            {/* drei types its ref as three-stdlib's OrbitControls; only target and update are used here */}
+            <OrbitControls ref={controls as never} makeDefault enableDamping />
             <Cloud data={data} group={h.groups[0]} size={view === 'event' ? Math.max(size - 0.4, 0.5) : size} opacity={view === 'event' ? 0.35 : 1} />
             {sim ? (
               <>
@@ -534,7 +549,7 @@ export default function PointWorld({ base = '/media/pointworld/', initial, stand
             {notes.truth_table && (
               <table className="pw-truth">
                 <thead><tr><th></th><th>3D world</th><th>Ground truth</th></tr></thead>
-                <tbody>{(notes.truth_table as [string, string, string][]).map(([a, b, c]) => <tr key={a}><td>{a}</td><td><b>{b}</b></td><td>{c}</td></tr>)}</tbody>
+                <tbody>{notes.truth_table.map(([a, b, c]) => <tr key={a}><td>{a}</td><td><b>{b}</b></td><td>{c}</td></tr>)}</tbody>
               </table>
             )}
             <div>Scale: {h.scale_from}{notes.check ? ` · check: ${notes.check}` : ''}</div>

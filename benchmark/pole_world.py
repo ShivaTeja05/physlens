@@ -8,7 +8,6 @@ hybrid measurement (pole15756.py: roof features tracked through all 351 frames o
 are seconds from impact.
 Usage: PYTHONPATH=backend backend/.venv/bin/python benchmark/pole_world.py
 """
-import json
 import sys
 from pathlib import Path
 

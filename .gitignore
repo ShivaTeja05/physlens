@@ -6,6 +6,8 @@ web/dist/
 media/
 replays/*.jsonl
 .DS_Store
+*.log
+*.part
 
 # API keys stay on this machine
 .env

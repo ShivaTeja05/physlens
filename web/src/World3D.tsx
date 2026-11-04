@@ -137,7 +137,7 @@ export default function World3D({ runId, time }: { runId: string; time: number }
   // Re-simulate straight away with the measured values, so the ghost shows where physics alone would go.
   useEffect(() => { if (scene && obj) run() }, [scene])   // eslint-disable-line react-hooks/exhaustive-deps
 
-  const atoms = obj ? scene!.atoms[obj.id] : []
+  const atoms = useMemo(() => (obj ? scene!.atoms[obj.id] : []), [obj, scene])
   const now = at(atoms, time)
   const pos: [number, number, number] | null = now
     ? [0, 1, 2].map((k) => now[0].p[k] + (now[1].p[k] - now[0].p[k]) * now[2]) as [number, number, number] : null

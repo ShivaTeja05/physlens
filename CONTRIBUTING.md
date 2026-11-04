@@ -20,7 +20,8 @@ One change per commit; the first line says what changed and, for measurements, t
 ## Rules that keep the project trustworthy
 - **Keys** stay in `backend/.env` (git-ignored). Never commit, print or paste them.
 - **Data** stays out of git: `datasets/`, `records/`, `media/` are ignored. Commit scripts that fetch or rebuild
-  them, and a `SOURCE.md` with the licence.
+  them, and a `SOURCE.md` with the licence. Only small demo clips live in `samples/` and `real_clips/`, each credited.
+- **No logs or scratch files**: `*.log` is ignored; keep results as `benchmark/<name>.json`.
 - **Claims** come with evidence. A number in the README or a demo must trace to a script and its `.json` result.
   Ground truth is only for checking, never an input. If a method was chosen after seeing the answer, say so.
 - **Failures** are written down in `benchmark/EVENTS.md`, not deleted.
