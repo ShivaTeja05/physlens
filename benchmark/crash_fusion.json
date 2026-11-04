@@ -1,0 +1,38 @@
+{
+ "cam17_body_points": 66974,
+ "cam17_frames_used": 12,
+ "cam17_impact_frame": 48,
+ "match": {
+  "scale": 0.8855,
+  "yaw_deg": 4.92,
+  "overlap_within_10cm": 0.263,
+  "rms_m": 0.0517
+ },
+ "fused_points": 100140,
+ "fused_from_cam17": 41808,
+ "coverage_cam15": {
+  "front": 49.6,
+  "rear": 10.5,
+  "left": 3.9,
+  "right": 73.2,
+  "top": 35.0
+ },
+ "coverage_fused": {
+  "front": 49.0,
+  "rear": 38.5,
+  "left": 17.7,
+  "right": 39.0,
+  "top": 46.2
+ },
+ "speed_from_poses_kmh": 65.42,
+ "body_length_m": 4.955,
+ "speed_from_poses_car_length_scale_kmh": 61.13,
+ "truth_kmh": 56.55,
+ "predicted": {
+  "points": 66862,
+  "mirror_plane_z": 0.011,
+  "width_from_front_m": 2.268,
+  "width_car_length_scale_m": 2.119,
+  "true_width_m": 1.814
+ }
+}

@@ -51,7 +51,7 @@ async function load(base: string, name: string): Promise<Loaded> {
 }
 
 /** One contiguous range of the point buffer as its own small-point cloud (no copies: subarray views). */
-function Cloud({ data, group, size, opacity = 1 }: { data: Loaded; group: Group; size: number; opacity?: number }) {
+function Cloud({ data, group, size, opacity = 1, tint }: { data: Loaded; group: Group; size: number; opacity?: number; tint?: string }) {
   const geom = useMemo(() => {
     const g = new THREE.BufferGeometry()
     g.setAttribute('position', new THREE.BufferAttribute(data.positions.subarray(group.start * 3, (group.start + group.count) * 3), 3))
@@ -62,7 +62,7 @@ function Cloud({ data, group, size, opacity = 1 }: { data: Loaded; group: Group;
   useEffect(() => () => geom.dispose(), [geom])
   return (
     <points geometry={geom} frustumCulled={false}>
-      <pointsMaterial size={size} sizeAttenuation={false} vertexColors transparent={opacity < 1} opacity={opacity} depthWrite={opacity >= 1} />
+      <pointsMaterial size={size} sizeAttenuation={false} vertexColors color={tint ?? '#ffffff'} transparent={opacity < 1} opacity={opacity} depthWrite={opacity >= 1} />
     </points>
   )
 }
@@ -204,8 +204,12 @@ type BodyNote = {
   poses: Pose[]; rigid_until_t: number | null; after_rigid: string | null; points: number; frames_used: number; frames: number
   coverage: { faces: Record<string, Face>; never_seen: string[]; size_m: { length: number; height: number; width: number } }
   seen_max: number
+  prior?: { make?: string; model?: string; years?: string; length_m?: number; width_m?: number; height_m?: number; confidence?: string; why?: string; source?: string }
+  predicted_side?: { side: string; points: number; width_used_m: number; how: string; real_points_beyond_far_side_dropped: number }
+  speed_from_poses?: { frames: number[]; kmh_ai_scale: number; kmh_prior_scale: number | null }
 }
-const BODY = 254, BODY_HEAT = 253
+const BODY = 254, BODY_HEAT = 253, PREDICTED = 252
+const PREDICTED_TINT = '#b49bff'   // predicted points: violet, never mistaken for measured ones
 
 /** The body's pose at time t: linear between the frames' poses (heading the short way round); null outside them. */
 function poseAt(poses: Pose[], t: number): { x: number; y: number; z: number; yaw: number } | null {
@@ -243,6 +247,7 @@ export default function PointWorld({ base = '/media/pointworld/', initial, stand
   const [colourBy, setColourBy] = useState<'real' | 'seen'>('real')
   const [tSim, setTSim] = useState(0)
   const [rate, setRate] = useState(0.5)
+  const [showPred, setShowPred] = useState(true)
   const controls = useRef<any>(null)
 
   useEffect(() => {
@@ -258,12 +263,13 @@ export default function PointWorld({ base = '/media/pointworld/', initial, stand
     load(base, name).then((d) => {
       setData(d)
       if (d.header.decimated_from) setSize(1.8)
-      const objs = d.header.groups.filter((g) => g.tag !== 255 && g.tag < BODY_HEAT)
+      const objs = d.header.groups.filter((g) => g.tag !== 255 && g.tag < PREDICTED)
       setTSim(objs[0]?.t ?? 0)
       setMode(d.header.groups.some((g) => g.tag === BODY) ? 'sim' : 'frames')
     }).catch((e) => setErr(String(e))).finally(() => setLoading(false))
   }, [name, base, standalone])
-  const objectGroups = data ? data.header.groups.filter((g) => g.tag !== 255 && g.tag < BODY_HEAT) : []
+  const objectGroups = data ? data.header.groups.filter((g) => g.tag !== 255 && g.tag < PREDICTED) : []
+  const predGroup = data?.header.groups.find((g) => g.tag === PREDICTED)
   const bodyGroup = data?.header.groups.find((g) => g.tag === BODY)
   const heatGroup = data?.header.groups.find((g) => g.tag === BODY_HEAT)
   const sim = mode === 'sim' && !!bodyGroup
@@ -369,6 +375,7 @@ export default function PointWorld({ base = '/media/pointworld/', initial, stand
                 {pose && bodyGroup && (
                   <group position={[pose.x, pose.y, pose.z]} rotation={[0, -pose.yaw, 0]}>
                     <Cloud data={data} group={colourBy === 'seen' && heatGroup ? heatGroup : bodyGroup} size={size + 0.4} />
+                    {showPred && predGroup && <Cloud data={data} group={predGroup} size={size + 0.4} opacity={0.8} tint={PREDICTED_TINT} />}
                   </group>
                 )}
                 {!pose && objectGroups[kNow] && <Cloud data={data} group={objectGroups[kNow]} size={size + 0.4} />}
@@ -414,6 +421,7 @@ export default function PointWorld({ base = '/media/pointworld/', initial, stand
               {[0.1, 0.25, 0.5, 1].map((r) => <option key={r} value={r}>{r === 1 ? 'real time' : `${r}×`}</option>)}</select></label>}
             {sim && heatGroup && <label>colour <select value={colourBy} onChange={(e) => setColourBy(e.target.value as 'real' | 'seen')}>
               <option value="real">real colour</option><option value="seen">times seen</option></select></label>}
+            {sim && predGroup && <label><input type="checkbox" checked={showPred} onChange={(e) => setShowPred(e.target.checked)} /> <span className="pw-pred-key">predicted side</span></label>}
             <label><input type="checkbox" checked={trail} onChange={(e) => setTrail(e.target.checked)} /> {sim ? 'path' : 'trail'}</label>
             {!sim && rigids.length > 0 && <label><input type="checkbox" checked={rigid} onChange={(e) => setRigid(e.target.checked)} /> whole body</label>}
             <label>point size <input type="range" min={0.5} max={3} step={0.1} value={size} onChange={(e) => setSize(+e.target.value)} /></label>
@@ -447,7 +455,21 @@ export default function PointWorld({ base = '/media/pointworld/', initial, stand
                   </div>
                 ))}
               </div>
-              {bodyNote.coverage.never_seen.length > 0 && <div className="pw-note">Never seen by the camera: {bodyNote.coverage.never_seen.map((f) => (FACE_NAMES[f] ?? f).toLowerCase()).join(', ')}. Those sides stay empty: nothing is filled in. "Times seen" colours each spot by how many frames measured it.</div>}
+              {bodyNote.coverage.never_seen.length > 0 && <div className="pw-note">Never seen by the camera: {bodyNote.coverage.never_seen.map((f) => (FACE_NAMES[f] ?? f).toLowerCase()).join(', ')}.
+                {bodyNote.predicted_side ? '' : ' Those sides stay empty: nothing is filled in.'} "Times seen" colours each spot by how many frames measured it.</div>}
+              {bodyNote.prior && (
+                <div className="pw-prior">
+                  <b>Identified by Muse Spark:</b> {bodyNote.prior.make} {bodyNote.prior.model}{bodyNote.prior.years ? ` (${bodyNote.prior.years})` : ''}, {bodyNote.prior.confidence} confidence.
+                  {' '}Published size {bodyNote.prior.length_m} × {bodyNote.prior.width_m} m. <span className="pw-note">Predicted from the model's knowledge, not measured{bodyNote.prior.why ? `: ${bodyNote.prior.why}` : ''}.</span>
+                </div>
+              )}
+              {bodyNote.predicted_side && (
+                <div className="pw-prior"><span className="pw-pred-key">Predicted {bodyNote.predicted_side.side} side</span>: {bodyNote.predicted_side.points.toLocaleString()} points by mirror symmetry
+                  (cars are left–right symmetric), the mirror plane half the identified width ({bodyNote.predicted_side.width_used_m.toFixed(2)} in this world's units) in from the seen side;
+                  {' '}{bodyNote.predicted_side.real_points_beyond_far_side_dropped.toLocaleString()} measured points that would sit beyond the far side (seen through the windows) were left out.</div>
+              )}
+              {bodyNote.speed_from_poses && <div>Speed from the whole body's poses (frames {bodyNote.speed_from_poses.frames[0]}–{bodyNote.speed_from_poses.frames[bodyNote.speed_from_poses.frames.length - 1]}, each showing ≥75% of it):
+                {' '}<b>{bodyNote.speed_from_poses.kmh_ai_scale.toFixed(1)} km/h</b> on the AI's depth scale{bodyNote.speed_from_poses.kmh_prior_scale ? <>, <b>{bodyNote.speed_from_poses.kmh_prior_scale.toFixed(1)} km/h</b> scaled by the identified model's length</> : null}</div>}
             </div>
           )}
           {(notes.explanation || !standalone) && (

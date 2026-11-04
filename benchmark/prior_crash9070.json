@@ -1,0 +1,13 @@
+{
+ "kind": "car",
+ "make": "Lexus",
+ "model": "RX",
+ "years": "2016-2022",
+ "length_m": 4.89,
+ "width_m": 1.895,
+ "height_m": 1.69,
+ "text_read": "",
+ "confidence": "medium",
+ "why": "dark grey midsize Lexus SUV in crash-test hall with yellow calibration stripe; door placard illegible, spindle-era body, rising beltline, kinked rear side glass and roofline match 4th-gen AL20 RX",
+ "source": "Muse Spark (muse-spark-1.3), published dimensions: predicted from knowledge, not measured"
+}

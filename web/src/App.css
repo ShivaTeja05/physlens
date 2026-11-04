@@ -385,3 +385,5 @@ header { padding-top: 12px; padding-bottom: 12px; }
 .pw-face.none { color: #ffb347; }
 .pw-face.none .pw-bar-track span { background: #ffb347; }
 .pw-face-pct { text-align: right; font-variant-numeric: tabular-nums; }
+.pw-pred-key { color: #b49bff; font-weight: 600; }
+.pw-prior { font-size: 13px; line-height: 1.45; }

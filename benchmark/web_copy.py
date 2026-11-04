@@ -30,8 +30,8 @@ def thin(name: str, out: Path) -> dict:
     for g in h["groups"]:
         sl = slice(g["start"], g["start"] + g["count"])
         # The object's moments keep a denser share than the static world (they are what is measured and played).
-        # The simulator's body (253/254) is kept whole: it's what plays, and it's already one point per 3 cm.
-        s = 1 if g["tag"] in (253, 254) else max(step - 1, 1) if g["tag"] != 255 else step
+        # The simulator's body (252-254: predicted side, heat, body) is kept whole: it's what plays, and it's already one point per 3 cm.
+        s = 1 if g["tag"] in (252, 253, 254) else max(step - 1, 1) if g["tag"] != 255 else step
         # A random (seeded) subset, not every n-th point: points come in pixel order, and a regular stride
         # leaves stripes.
         pick = np.sort(rng.choice(g["count"], g["count"] // s, replace=False)) if s > 1 else np.arange(g["count"])

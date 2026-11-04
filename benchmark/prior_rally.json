@@ -1,0 +1,13 @@
+{
+ "kind": "car",
+ "make": "Toyota",
+ "model": "Yaris WRC",
+ "years": "2017-2021",
+ "length_m": 4.085,
+ "width_m": 1.875,
+ "height_m": 1.8,
+ "text_read": "10 J.M. Latvala M. Anttila Microsoft LE CASINO MONTE-CARLO",
+ "confidence": "high",
+ "why": "WRC wide-body Yaris hatch with large rear wing, Toyota Gazoo Racing Microsoft livery, Latvala/Anttila No.10 Monte-Carlo car, Yaris headlight and roofline shape",
+ "source": "Muse Spark (muse-spark-1.3), published dimensions: predicted from knowledge, not measured"
+}

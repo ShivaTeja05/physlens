@@ -1,4 +1,264 @@
 {
+ "crash-9070": {
+  "rigid_frames": [
+   36,
+   44
+  ],
+  "rigid_until_t": 1.4681,
+  "after_rigid": "the front crushes against the barrier",
+  "points": 58010,
+  "frames_used": 9,
+  "frames": 9,
+  "passes": [
+   {
+    "pass": 1,
+    "frames_used": 9,
+    "points": 58973
+   },
+   {
+    "pass": 2,
+    "frames_used": 9,
+    "points": 58929,
+    "largest_move_m": 0.0053
+   }
+  ],
+  "coverage": {
+   "faces": {
+    "front": {
+     "covered_pct": 57.7,
+     "area_m2": 1.05,
+     "most_frames_on_a_spot": 5,
+     "points": 5084
+    },
+    "rear": {
+     "covered_pct": 14.8,
+     "area_m2": 0.27,
+     "most_frames_on_a_spot": 4,
+     "points": 1720
+    },
+    "left": {
+     "covered_pct": 7.1,
+     "area_m2": 0.44,
+     "most_frames_on_a_spot": 4,
+     "points": 2092
+    },
+    "right": {
+     "covered_pct": 73.2,
+     "area_m2": 4.51,
+     "most_frames_on_a_spot": 8,
+     "points": 23742
+    },
+    "top": {
+     "covered_pct": 46.3,
+     "area_m2": 2.65,
+     "most_frames_on_a_spot": 7,
+     "points": 6721
+    }
+   },
+   "never_seen": [
+    "left"
+   ],
+   "size_m": {
+    "length": 4.956,
+    "height": 1.949,
+    "width": 1.814
+   }
+  },
+  "seen_max": 8,
+  "seen_median": 2.0,
+  "prior": {
+   "make": "Lexus",
+   "model": "RX",
+   "years": "2016-2022",
+   "length_m": 4.89,
+   "width_m": 1.895,
+   "height_m": 1.69,
+   "confidence": "medium",
+   "text_read": "",
+   "why": "dark grey midsize Lexus SUV in crash-test hall with yellow calibration stripe; door placard illegible, spindle-era body, rising beltline, kinked rear side glass and roofline match 4th-gen AL20 RX",
+   "source": "Muse Spark (muse-spark-1.3), published dimensions: predicted from knowledge, not measured"
+  },
+  "length_measured_ai_scale_m": 4.955,
+  "scale_from_prior": 0.9869,
+  "speed_from_poses": {
+   "frames": [
+    40,
+    41,
+    42,
+    43,
+    44
+   ],
+   "kmh_ai_scale": 60.91,
+   "kmh_prior_scale": 60.11
+  },
+  "predicted_side": {
+   "side": "left",
+   "points": 47236,
+   "mirror_plane_z": 0.288,
+   "width_used_m": 1.92,
+   "real_points_beyond_far_side_dropped": 1039,
+   "how": "mirror symmetry about the car's centre plane, placed half the identified model's published width in from the seen side"
+  },
+  "truth_rows": [
+   [
+    "Identified by Muse Spark",
+    "Lexus RX (medium)",
+    "2015 Lexus NX 200t"
+   ],
+   [
+    "Length, AI depth scale",
+    "4.95 m",
+    "4.63 m"
+   ],
+   [
+    "Length, identified model (predicted)",
+    "4.89 m",
+    "4.63 m"
+   ],
+   [
+    "Width, identified model (predicted)",
+    "1.90 m",
+    "1.814 m"
+   ],
+   [
+    "Speed from the body's poses, AI depth scale",
+    "60.9 km/h",
+    "56.55 km/h"
+   ],
+   [
+    "Speed, scaled by the identified model's length",
+    "60.1 km/h",
+    "56.55 km/h"
+   ],
+   [
+    "Speed, scaled by the true length (check)",
+    "56.9 km/h",
+    "56.55 km/h"
+   ]
+  ]
+ },
+ "rally-sharp": {
+  "rigid_frames": [
+   166,
+   184
+  ],
+  "rigid_until_t": 6.1395,
+  "after_rigid": null,
+  "points": 37598,
+  "frames_used": 6,
+  "frames": 10,
+  "passes": [
+   {
+    "pass": 1,
+    "frames_used": 6,
+    "points": 38983
+   },
+   {
+    "pass": 2,
+    "frames_used": 6,
+    "points": 38867,
+    "largest_move_m": 0.0039
+   }
+  ],
+  "coverage": {
+   "faces": {
+    "front": {
+     "covered_pct": 43.9,
+     "area_m2": 0.58,
+     "most_frames_on_a_spot": 2,
+     "points": 1689
+    },
+    "rear": {
+     "covered_pct": 28.0,
+     "area_m2": 0.37,
+     "most_frames_on_a_spot": 3,
+     "points": 1965
+    },
+    "left": {
+     "covered_pct": 22.0,
+     "area_m2": 0.8,
+     "most_frames_on_a_spot": 4,
+     "points": 3475
+    },
+    "right": {
+     "covered_pct": 9.4,
+     "area_m2": 0.34,
+     "most_frames_on_a_spot": 3,
+     "points": 2370
+    },
+    "top": {
+     "covered_pct": 48.2,
+     "area_m2": 1.91,
+     "most_frames_on_a_spot": 5,
+     "points": 6967
+    }
+   },
+   "never_seen": [
+    "right"
+   ],
+   "size_m": {
+    "length": 3.878,
+    "height": 1.637,
+    "width": 1.769
+   }
+  },
+  "seen_max": 6,
+  "seen_median": 1.0,
+  "prior": {
+   "make": "Toyota",
+   "model": "Yaris WRC",
+   "years": "2017-2021",
+   "length_m": 4.085,
+   "width_m": 1.875,
+   "height_m": 1.8,
+   "confidence": "high",
+   "text_read": "10 J.M. Latvala M. Anttila Microsoft LE CASINO MONTE-CARLO",
+   "why": "WRC wide-body Yaris hatch with large rear wing, Toyota Gazoo Racing Microsoft livery, Latvala/Anttila No.10 Monte-Carlo car, Yaris headlight and roofline shape",
+   "source": "Muse Spark (muse-spark-1.3), published dimensions: predicted from knowledge, not measured"
+  },
+  "length_measured_ai_scale_m": 3.876,
+  "scale_from_prior": 1.054,
+  "speed_from_poses": {
+   "frames": [
+    174,
+    176,
+    178,
+    180
+   ],
+   "kmh_ai_scale": 127.82,
+   "kmh_prior_scale": 134.72
+  },
+  "predicted_side": {
+   "side": "right",
+   "points": 23899,
+   "mirror_plane_z": -0.062,
+   "width_used_m": 1.779,
+   "real_points_beyond_far_side_dropped": 548,
+   "how": "mirror symmetry about the car's centre plane, placed half the identified model's published width in from the seen side"
+  },
+  "truth_rows": [
+   [
+    "Identified by Muse Spark",
+    "Toyota Yaris WRC (high)",
+    "2019 Toyota Yaris WRC"
+   ],
+   [
+    "Length, AI depth scale",
+    "3.88 m",
+    "4.085 m"
+   ],
+   [
+    "Length, identified model (predicted)",
+    "4.08 m",
+    "4.085 m"
+   ],
+   [
+    "Width, identified model (predicted)",
+    "1.88 m",
+    "1.875 m"
+   ]
+  ]
+ },
  "truck-sharp": {
   "rigid_frames": [
    116,
@@ -6,19 +266,19 @@
   ],
   "rigid_until_t": 6.5399,
   "after_rigid": "the roof is torn open at the beam",
-  "points": 230647,
+  "points": 230650,
   "frames_used": 21,
   "frames": 21,
   "passes": [
    {
     "pass": 1,
     "frames_used": 21,
-    "points": 228733
+    "points": 228741
    },
    {
     "pass": 2,
     "frames_used": 21,
-    "points": 228169,
+    "points": 228179,
     "largest_move_m": 0.0088
    }
   ],
@@ -28,31 +288,31 @@
      "covered_pct": 4.1,
      "area_m2": 0.18,
      "most_frames_on_a_spot": 5,
-     "points": 2042
+     "points": 2038
     },
     "rear": {
      "covered_pct": 100.0,
      "area_m2": 4.42,
      "most_frames_on_a_spot": 11,
-     "points": 41655
+     "points": 41653
     },
     "left": {
      "covered_pct": 98.4,
-     "area_m2": 22.0,
+     "area_m2": 22.01,
      "most_frames_on_a_spot": 18,
-     "points": 80784
+     "points": 80774
     },
     "right": {
      "covered_pct": 10.1,
      "area_m2": 2.26,
      "most_frames_on_a_spot": 10,
-     "points": 14452
+     "points": 14462
     },
     "top": {
      "covered_pct": 97.1,
      "area_m2": 14.19,
      "most_frames_on_a_spot": 7,
-     "points": 41500
+     "points": 41451
     }
    },
    "never_seen": [
@@ -65,6 +325,44 @@
    }
   },
   "seen_max": 18,
-  "seen_median": 1.0
+  "seen_median": 1.0,
+  "prior": {
+   "make": "Unknown",
+   "model": "Box truck (Ryder rental class)",
+   "years": "unknown",
+   "length_m": 7.92,
+   "width_m": 2.59,
+   "height_m": 3.51,
+   "confidence": "low",
+   "text_read": "Ryder Truck Rental & Leasing",
+   "why": "White box truck with Ryder Truck Rental & Leasing livery on rear and side; no manufacturer badge or model text readable, identified only as generic rental box truck by shape",
+   "source": "Muse Spark (muse-spark-1.3), published dimensions: predicted from knowledge, not measured"
+  },
+  "length_measured_ai_scale_m": 9.143,
+  "scale_from_prior": 0.8662,
+  "speed_from_poses": {
+   "frames": [
+    116,
+    120,
+    124,
+    128,
+    132,
+    136,
+    140,
+    144,
+    148,
+    152,
+    156,
+    160,
+    164,
+    168,
+    172,
+    176,
+    180,
+    184
+   ],
+   "kmh_ai_scale": 20.47,
+   "kmh_prior_scale": 17.73
+  }
  }
 }

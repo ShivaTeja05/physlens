@@ -19,19 +19,23 @@ sys.path.insert(0, str(ROOT / "backend"))
 from physlens.objsim import build_body, clean, coverage, heat   # noqa: E402
 
 PW = ROOT / "media" / "pointworld"
-BODY, BODY_HEAT = 254, 253
+BODY, BODY_HEAT, PREDICTED = 254, 253, 252
 
 # Per world: the frames it is rigid in, the reference frame, the face that pins its along-path position for boxy
 # bodies whose flat sides let registration slide (None: free), and the clean-up's reach: how far from the frame's
 # centre the body extends (radius) and the depth gap that separates it from background (gap: the truck's side is
 # seen edge-on, so its own points are sparse in depth).
 CONFIG = {
-    "truck-sharp": {"rigid": (116, 196), "ref": 176, "anchor": "rear", "radius": 9.5, "gap": 2.0,
+    "truck-sharp": {"rigid": (116, 196), "ref": 176, "anchor": "rear", "radius": 9.5, "gap": 2.0, "prior": "truck2",
                     "label": "the roof is torn open at the beam"},
     "truck": {"rigid": (116, 196), "ref": 176, "anchor": "rear", "radius": 9.5, "gap": 2.0, "label": "the roof is torn open at the beam"},
-    "crash-9070": {"rigid": (36, 44), "ref": 43, "anchor": "front", "radius": 3.2,
+    "crash-9070": {"rigid": (36, 44), "ref": 43, "anchor": "front", "radius": 3.2, "prior": "crash9070",
+                   "truth": {"model": "2015 Lexus NX 200t", "length_m": 4.63, "width_m": 1.814, "speed_kmh": 56.55,
+                             "source": "NHTSA test 9070"},
                    "label": "the front crushes against the barrier"},
-    "rally-sharp": {"rigid": (166, 184), "ref": 176, "anchor": None, "cut": 0.35, "radius": 2.8, "label": None},
+    "rally-sharp": {"rigid": (166, 184), "ref": 176, "anchor": None, "cut": 0.35, "radius": 2.8, "label": None,
+                    "prior": "rally", "truth": {"model": "2019 Toyota Yaris WRC", "length_m": 4.085, "width_m": 1.875,
+                                                "source": "published"}},
     "rally": {"rigid": (166, 184), "ref": 176, "anchor": None, "cut": 0.35, "radius": 2.8, "label": None},
 }
 
@@ -57,6 +61,89 @@ def save(name, h, P, C, tag):
     (PW / f"{name}.json").write_text(json.dumps(h))
 
 
+CACHE = ROOT / "records" / "real_cache"
+MIN_VISIBLE = 0.75     # poses used for speed: frames showing at least this share of the body's length
+
+
+def visible_share(clouds, poses, length):
+    """Per frame: the share of the body's length its points span, in body coordinates."""
+    out = []
+    for cl, p in zip(clouds, poses):
+        if not p["used"]:
+            out.append(None)
+            continue
+        c, s_ = np.cos(p["yaw"]), np.sin(p["yaw"])
+        R = np.array([[c, 0, -s_], [0, 1, 0], [s_, 0, c]])
+        b = (cl - [p["x"], p["y"], p["z"]]) @ R            # world → body (R is body → world)
+        out.append(round(float(np.subtract(*np.percentile(b[:, 0], [98, 2])) / length), 3))
+    return out
+
+
+def predict(name, cfg, body, cov, h):
+    """Stage 3b, predicted and labelled: the identified model's published size (Muse Spark, priors.py) gives the
+    scale; its width places the mirror plane for the side no frame saw (vehicles are left-right symmetric); speed
+    from the poses of frames that show most of the body. Returns (predicted points, colours, notes)."""
+    pf = CACHE / cfg["prior"] / "prior.json" if cfg.get("prior") else None
+    if pf is None or not pf.exists():
+        return None, None, {}
+    prior = json.loads(pf.read_text())
+    P = body.points
+    L = float(np.subtract(*np.percentile(P[:, 0], [99, 1])))
+    notes = {"prior": {k: prior.get(k) for k in ("make", "model", "years", "length_m", "width_m", "height_m",
+                                                  "confidence", "text_read", "why", "source")},
+             "length_measured_ai_scale_m": round(L, 3)}
+    k = prior["length_m"] / L if prior.get("length_m") else None
+    notes["scale_from_prior"] = round(k, 4) if k else None
+    # Speed from the poses (whole body), frames showing most of it.
+    good = [p for p in body.poses if p["used"] and (p.get("visible") or 0) >= MIN_VISIBLE]
+    if len(good) >= 3:
+        xz = np.array([[p["x"], p["z"]] for p in good])
+        tt = np.array([p["t"] for p in good])
+        d = xz[-1] - xz[0]
+        d /= np.linalg.norm(d)
+        v = float(np.polyfit(tt, xz @ d, 1)[0])
+        notes["speed_from_poses"] = {"frames": [p["frame"] for p in good], "kmh_ai_scale": round(v * 3.6, 2),
+                                     "kmh_prior_scale": round(v * 3.6 * k, 2) if k else None}
+    pred = cols = None
+    hidden = [f for f in ("left", "right") if f in cov["never_seen"]]
+    if hidden and prior.get("width_m") and k:
+        w = prior["width_m"] / k                          # the published width in this world's units
+        if hidden[0] == "left":                           # seen side at −z
+            near = float(np.percentile(P[:, 2], 2))
+            plane = near + w / 2
+            seen = P[:, 2] < plane
+            beyond = P[:, 2] > near + w + 0.05
+        else:
+            near = float(np.percentile(P[:, 2], 98))
+            plane = near - w / 2
+            seen = P[:, 2] > plane
+            beyond = P[:, 2] < near - w - 0.05
+        pred = P[seen].copy()
+        pred[:, 2] = 2 * plane - pred[:, 2]
+        cols = body.colours[seen]
+        notes["predicted_side"] = {"side": hidden[0], "points": int(len(pred)), "mirror_plane_z": round(plane, 3),
+                                   "width_used_m": round(w, 3), "real_points_beyond_far_side_dropped": int(beyond.sum()),
+                                   "how": "mirror symmetry about the car's centre plane, placed half the identified "
+                                          "model's published width in from the seen side"}
+        notes["_drop"] = beyond
+    if cfg.get("truth"):
+        tr = cfg["truth"]
+        rows = [["Identified by Muse Spark", f"{prior.get('make', '')} {prior.get('model', '')} ({prior.get('confidence')})", tr["model"]],
+                ["Length, AI depth scale", f"{L:.2f} m", f"{tr['length_m']} m"]]
+        if prior.get("length_m"):
+            rows.append(["Length, identified model (predicted)", f"{prior['length_m']:.2f} m", f"{tr['length_m']} m"])
+        if prior.get("width_m"):
+            rows.append(["Width, identified model (predicted)", f"{prior['width_m']:.2f} m", f"{tr['width_m']} m"])
+        sp = notes.get("speed_from_poses")
+        if sp and tr.get("speed_kmh"):
+            rows.append(["Speed from the body's poses, AI depth scale", f"{sp['kmh_ai_scale']:.1f} km/h", f"{tr['speed_kmh']} km/h"])
+            if sp.get("kmh_prior_scale"):
+                rows.append(["Speed, scaled by the identified model's length", f"{sp['kmh_prior_scale']:.1f} km/h", f"{tr['speed_kmh']} km/h"])
+            rows.append(["Speed, scaled by the true length (check)", f"{sp['kmh_ai_scale'] * tr['length_m'] / L:.1f} km/h", f"{tr['speed_kmh']} km/h"])
+        notes["truth_rows"] = rows
+    return pred, cols, notes
+
+
 def simulate(name):
     cfg = CONFIG[name]
     h, P, C, tag = load(name)
@@ -64,12 +151,12 @@ def simulate(name):
     keep_pts = np.ones(len(P), bool)
     groups = []
     for g in h["groups"]:
-        if g["tag"] in (BODY, BODY_HEAT):
+        if g["tag"] in (BODY, BODY_HEAT, PREDICTED):
             keep_pts[g["start"]:g["start"] + g["count"]] = False
     if not keep_pts.all():
         idx = np.cumsum(keep_pts) - 1
         for g in h["groups"]:
-            if g["tag"] not in (BODY, BODY_HEAT):
+            if g["tag"] not in (BODY, BODY_HEAT, PREDICTED):
                 groups.append({**g, "start": int(idx[g["start"]])})
         P, C, tag = P[keep_pts], C[keep_pts], tag[keep_pts]
         h["groups"] = groups
@@ -101,21 +188,35 @@ def simulate(name):
         lock = (d, face - face[frames.index(cfg["ref"])] + centres[frames.index(cfg["ref"]), [0, 2]] @ d)
     body = build_body(clouds, cols, frames, times, frames.index(cfg["ref"]), centres, heads, lock=lock,
                       cut=cfg.get("cut", 0.25))                    # stage 2
+    vis = visible_share(clouds, body.poses, float(np.subtract(*np.percentile(body.points[:, 0], [98, 2]))))
+    for p, v in zip(body.poses, vis):
+        p["visible"] = v
     cov = coverage(body)                                           # stage 3
+    pred, pred_c, pnotes = predict(name, cfg, body, cov, h)        # stage 3b, labelled as predicted
+    drop = pnotes.pop("_drop", None)
+    if drop is not None and drop.any():
+        from physlens.objsim import Body
+        body = Body(body.points[~drop], body.colours[~drop], body.seen[~drop], body.frames, body.t, body.poses, body.passes)
+        cov = coverage(body)
     hc = heat(body.seen)
     start = len(P)
     nb = len(body.points)
-    P = np.vstack([P, body.points, body.points])
-    C = np.vstack([C, body.colours, hc])
-    tag = np.concatenate([tag, np.full(nb, BODY), np.full(nb, BODY_HEAT)])
+    P = np.vstack([P, body.points, body.points] + ([pred] if pred is not None else []))
+    C = np.vstack([C, body.colours, hc] + ([pred_c] if pred is not None else []))
+    tag = np.concatenate([tag, np.full(nb, BODY), np.full(nb, BODY_HEAT)] + ([np.full(len(pred), PREDICTED)] if pred is not None else []))
     h["groups"] = h["groups"] + [{"tag": BODY, "start": start, "count": nb},
                                  {"tag": BODY_HEAT, "start": start + nb, "count": nb}]
+    if pred is not None:
+        h["groups"].append({"tag": PREDICTED, "start": start + 2 * nb, "count": int(len(pred))})
     used = [p for p in body.poses if p["used"]]
     h["notes"]["body"] = {"poses": body.poses, "rigid_frames": [lo_f, hi_f],
                           "rigid_until_t": max(p["t"] for p in used) if used else None,
                           "after_rigid": cfg["label"], "points": nb, "frames_used": len(used), "frames": len(sel),
                           "passes": body.passes, "coverage": cov,
-                          "seen_max": int(body.seen.max()), "seen_median": float(np.median(body.seen))}
+                          "seen_max": int(body.seen.max()), "seen_median": float(np.median(body.seen)), **pnotes}
+    if pnotes.get("truth_rows"):
+        rest = [r for r in h["notes"].get("truth_table", []) if not r[0].startswith(("Identified", "Length,", "Width,", "Speed"))]
+        h["notes"]["truth_table"] = pnotes["truth_rows"] + rest
     save(name, h, P, C, tag)
     return h["notes"]["body"]
 
