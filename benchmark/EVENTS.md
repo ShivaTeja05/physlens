@@ -15,6 +15,7 @@ All footage is public (NHTSA, NASA, Wikimedia Commons; see each `datasets/*/SOUR
 | | | travel at **74.6°** to the car's axis | 75° (the test's impact angle) | |
 | | | length 4.27 m (from the width scale) | 4.354 m | |
 | | | 0.36 m further towards the pole, stops at 65 ms; turns 35° by 300 ms | (accelerometers not yet compared) | |
+| | 3D world (`pole_world.py`) | the car's body moved by that measurement; at 300 ms it sits a median 0.21 m from the car's measured points (the struck side is crushed; the turn's pivot is approximate) | | |
 | 11foot8 bridge: box truck under a 3.556 m beam | street pole camera, 30 fps | impact found at frame 196.6; beam clearance 3.63 m | hand label 196–200; sign 3.556 m | `world_events.py` |
 | NHTSA 9001: barrier cart into a parked Camry | real-time rear view, 30 fps | parked Camry 4.54–4.78 m (lens range); Muse Spark: Camry, 4.869 m | 4.85 m | `side9001_3d.py` |
 | | | cart 25–33 km/h ✗ | 62.19 km/h | |

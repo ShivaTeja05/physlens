@@ -131,7 +131,11 @@ def main():
            "curve": {"t_ms": (t * 1000).round(1).tolist(), "travel_m": x.round(4).tolist(), "yaw_deg": yaw.round(2).tolist()}}
     print(json.dumps({kk: vv for kk, vv in res.items() if kk != "curve"}, indent=1))
     (ROOT / "benchmark" / "pole15756.json").write_text(json.dumps(res, default=float))
-    return res
+    # The geometry behind it, for the 3D world (pole_world.py): camera frame of frame 0, MoGe-3 units.
+    feat0 = np.argwhere(region0)[:, ::-1].mean(0)
+    geom = {"K": K, "n": n, "c": c, "d": d, "axis": ax, "k": k, "depth0": D, "valid0": Mv, "car0": car,
+            "feature_centre0": plane_point(feat0[None], K, n, c)[0], "lens_k1": lens["k1"], "size": (w, h)}
+    return res, geom
 
 
 if __name__ == "__main__":
