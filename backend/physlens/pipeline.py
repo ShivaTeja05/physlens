@@ -147,9 +147,14 @@ def _lab_tracker(spec):
 
 
 def _run_lab(video, card, log, ledger, agent, video_url, px_per_m, params, tracker_for) -> dict:
-    from .labs import projectile, race, springs
+    from .labs import crash, projectile, race, springs
     from .labs.common import ObjectTrack
-    labs = {"projectile": projectile, "race": race, "springs": springs}
+    labs = {"projectile": projectile, "race": race, "springs": springs, "crash": crash}
+    if tracker_for is None and card.kind == "crash":
+        # A fixed crash-test camera opens on the empty scene: background subtraction gives the car's exact edges,
+        # free and frame-exact (SAM's outlines are simplified, which blurs the edges a speed measurement needs).
+        from .perception.box_tracker import BoxTracker
+        tracker_for = lambda spec: BoxTracker()
     tracker_for = tracker_for or _lab_tracker
     info = video_info(video)
     names = " · ".join(f"{o.prompt}: {tracker_for(o).name}" for o in card.objects)

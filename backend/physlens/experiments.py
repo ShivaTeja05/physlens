@@ -106,4 +106,23 @@ CARDS = {
             "miss": "The scale says {mass:.0f} grams. Outside the prediction, and that goes on the scoreboard.",
         },
     ),
+    "crash": ExperimentCard(
+        id="crash",
+        title="Crash reconstruction",
+        hook="A fixed side camera watches a car hit a barrier: speed, impact, crush and rebound, from the video alone.",
+        prompt="car",
+        color=None,
+        reference_diameter_m=4.6,
+        lock_after_contacts=0,
+        memory_g=9.81,
+        kind="crash",
+        objects=(ObjectSpec("car", "car", None),),
+        params={"car_length_m": 4.6, "mass_kg": 1800.0},
+        narration={
+            "intro": "A car, a concrete barrier, one side camera. Everything else comes from the pixels.",
+            "locked": "Locked before impact: {kmh:.1f} kilometres per hour.",
+            "hit": "The lab's own measurement: {kmh:.2f} km/h. Inside our band.",
+            "miss": "The lab's own measurement: {kmh:.2f} km/h. Outside our band, and that goes on the scoreboard.",
+        },
+    ),
 }

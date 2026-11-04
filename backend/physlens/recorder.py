@@ -175,8 +175,8 @@ def record_run(run_id: str, events: list[dict], replays: Path, roots: dict[str, 
             law_y = next((e for e in events if e["type"] == "law" and e.get("object") == oid and e["axis"] == "y"), None)
             g = next((-t["value"] for t in law_y["terms"] if t["term"] == "1"), None) if law_y and \
                 not any(t["term"] == "q" for t in law_y["terms"]) else None
-            # Bounces and peaks are vertical motion; analyses that report their own moments keep those instead.
-            vertical = [] if any(e["type"] == "moment" for e in events) else key_moments(a[:, 0], a[:, 2], a[:, 4], g=g)
+            # Bounces and peaks are vertical motion; analyses like the crash report their own moments instead.
+            vertical = [] if exp == "crash" or any(e["type"] == "moment" for e in events) else key_moments(a[:, 0], a[:, 2], a[:, 4], g=g)
             for m in vertical:
                 i = m["i"]
                 db.execute("INSERT INTO event VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",

@@ -22,6 +22,13 @@ when it starts (an install at startup doesn't work on RunPod, which restarts con
 ```
 Returns one compressed `npz` per view: `depth_z` (m), `conf`, `mask`, `intrinsics`, `camera_pose`, `metric_scale`.
 
+**MoGe-3** (Microsoft, MIT code and weights `Ruicheng/moge-3-vitl`): sharp metric depth per image at its own resolution.
+```json
+{"input": {"task": "moge", "images": ["<base64 jpg>"], "fov_x": 62.5}}
+```
+Returns per image: `depth` (m), `mask`, `normal` (int8 ×127), `intrinsics` (pixels). PhysLens aligns it to
+MapAnything's depth and lifts it with MapAnything's camera poses, for full-resolution point clouds.
+
 ## Other files
 `boot.sh` and `runpod_deploy.py` are an earlier install-at-startup setup kept for reference. Don't use them; RunPod
 stops the container before the install finishes.

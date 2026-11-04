@@ -6,6 +6,12 @@ const engine = 'http://127.0.0.1:8000'
 
 export default defineConfig({
   plugins: [react()],
+  // Relative asset paths, so the built simulator page also works from a static folder (a shared copy).
+  base: './',
+  build: {
+    // Both pages, relative to this folder (Vite's root), so no Node types are needed to type-check this file.
+    rollupOptions: { input: { main: 'index.html', sim: 'sim.html' } },
+  },
   server: {
     port: 5173,
     proxy: {

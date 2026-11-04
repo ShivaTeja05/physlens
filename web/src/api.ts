@@ -81,11 +81,16 @@ export async function scanStatus(jobId: string): Promise<ScanStatus> {
   return r.json()
 }
 
-// --- Recorder: past runs -----------------------------------------------------------------------------------------
+// --- Recorder: past runs, replay and what-if -------------------------------------------------------------------
 
 export type RecordRow = {
   id: string; recorded_at: string; experiment: string | null; source_url: string; fps: number; duration: number
   status: string; objects: number; contacts: number; hits: number; verdicts: number
+}
+export type SimPath = { t: number[]; x_m: number[]; y_m: number[]; peaks: { t: number; height_m: number }[]; params: Record<string, number | null> }
+export type WhatIf = {
+  object: string; measured: { law: string; restitution: number | null; gravity: number | null; start_t: number; floor_m: number | null }
+  replay: SimPath; what_if: SimPath | null; rms_m: number | null; summary: string[]; px_from_m: [number, number, number, number] | null
 }
 
 export async function getRecords(): Promise<RecordRow[]> {
@@ -99,3 +104,12 @@ export async function getRecordEvents(id: string): Promise<PhysEvent[]> {
   return r.json()
 }
 
+export async function whatIf(id: string, object: string, changes: { gravity?: number; restitution?: number; speed_factor?: number; drag?: number }): Promise<WhatIf> {
+  const form = new FormData()
+  form.set('object', object)
+  for (const [k, v] of Object.entries(changes)) if (v !== undefined) form.set(k, String(v))
+  const r = await fetch(`/api/records/${id}/whatif`, { method: 'POST', body: form })
+  const body = await r.json()
+  if (!r.ok) throw new Error(body.detail ?? r.statusText)
+  return body
+}

@@ -1,0 +1,94 @@
+{
+  "clip": "samples/moving-camera-drop.mp4",
+  "frames": 157,
+  "fps": 60.0,
+  "pipeline": {
+    "floor_points": 18766,
+    "points": 68399,
+    "camera_tilt_from_floor_up_deg": 7.1,
+    "keyframes": 17,
+    "frames_posed_by_pnp": 140,
+    "radius_m": 0.0574,
+    "radius_from": "bounces touch the floor",
+    "radius_from_depth_m": 0.0974,
+    "radius_scene_units": 0.0574,
+    "scale_from": "MapAnything",
+    "scale_applied": 1.0,
+    "radius_spread_m": 0.0186,
+    "focal_px": 457.8,
+    "focal_from": "MapAnything",
+    "focal_mapanything_px": 457.8
+  },
+  "truth": {
+    "g": 9.81,
+    "restitution": 0.78,
+    "radius_m": 0.06,
+    "focal_px": 560.0,
+    "physics_on_true_path": {
+      "g": 9.81,
+      "g_err": 0.0,
+      "flights": 3,
+      "restitution": [
+        0.78
+      ],
+      "contact_heights": [
+        0.06001692142969661
+      ],
+      "rmse_m": 0.0
+    }
+  },
+  "world": {
+    "g": 8.937,
+    "g_err": 0.03,
+    "flights": 4,
+    "restitution": [
+      0.767,
+      0.774,
+      0.783
+    ],
+    "contact_heights": [
+      0.057763488738671986,
+      0.05739702943613301,
+      0.05250526136945877
+    ],
+    "rmse_m": 0.0056
+  },
+  "pixels": {
+    "g": 3.603,
+    "g_err": 0.045,
+    "flights": 4,
+    "restitution": [
+      0.786,
+      0.771,
+      0.766
+    ],
+    "contact_heights": [
+      0.07098218629739916,
+      0.06743779634421032,
+      0.05741282274032167
+    ],
+    "rmse_m": 0.0084
+  },
+  "errors": {
+    "ball_rms_m": 0.6544,
+    "ball_height_rms_m": 0.0509,
+    "camera_rms_m": 0.1835,
+    "scale_ratio": 1.74,
+    "g_rel": 0.089,
+    "g_rel_pixels": 0.6327
+  },
+  "mujoco": {
+    "params": {
+      "g": 8.937,
+      "e0": 0.759,
+      "e1": 0.0009,
+      "y0": 1.4595,
+      "vy0": -0.3649,
+      "x0": -0.1651,
+      "vx0": 0.3314
+    },
+    "rms_m": 0.0276,
+    "rms_unfitted_m": 0.0517
+  },
+  "mode": "blind"
+}
