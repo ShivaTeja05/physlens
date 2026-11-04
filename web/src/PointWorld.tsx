@@ -241,7 +241,7 @@ function CrushChart({ c }: { c: { t_ms: number[]; video_m: (number | null)[]; se
     <svg className="pw-chart" viewBox={`0 0 ${W} ${H}`} role="img" aria-label="Rear travel since impact: 3D points vs accelerometers">
       {yTicks.map((v) => <g key={v}><line x1={L} x2={W - R} y1={Y(v)} y2={Y(v)} className="grid" /><text x={L - 6} y={Y(v) + 4} textAnchor="end">{v.toFixed(1)}</text></g>)}
       {tTicks.map((t) => <text key={t} x={X(t)} y={H - 10} textAnchor="middle">{t}</text>)}
-      <text x={W - R} y={H - 10} textAnchor="end" className="unit">ms after impact</text>
+      <text x={W - R} y={T + 12} textAnchor="end" className="unit">ms after impact →</text>
       <text x={L - 6} y={T + 2} textAnchor="end" className="unit">m</text>
       <path d={path(sen)} className="sensor" />
       <path d={path(pts)} className="video" />
@@ -528,7 +528,7 @@ export default function PointWorld({ base = '/media/pointworld/', initial, stand
               <div className="pw-chart-wrap">
                 <div className="pw-events-title">Crush: how far the car's rear kept moving after impact</div>
                 <CrushChart c={notes.crush_curve} />
-                <div className="pw-note"><span className="pw-key-video">dots</span>: the rigid rear section tracked in the 1,000 fps camera's 3D points · <span className="pw-key-sensor">line</span>: NHTSA's rear-floor accelerometers, integrated</div>
+                <div className="pw-note"><span className="pw-key-video">blue</span>: the car's rear part tracked in the 1,000 fps camera (2D tracking, metric on its side plane) · <span className="pw-key-sensor">line</span>: NHTSA's rear-floor accelerometers, integrated</div>
               </div>
             )}
             {notes.truth_table && (
