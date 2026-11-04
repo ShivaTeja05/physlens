@@ -35,3 +35,27 @@ def test_motion_on_an_oblique_plane():
     r = track_part(frames, region, 0, len(frames) - 1, K, n_fit, c_fit, d)
     err = np.abs(r["along_m"] - x_true)
     assert err.max() < 0.01, err.max()                    # within a centimetre over the whole 40 ms
+
+
+def test_track_rigid_turn_and_slide():
+    """A textured patch on a plane 5 m from a straight-down camera turns 0.5° and slides 1 cm per frame: the
+    tracker's pose gives both (image y points down, so a turn shown anticlockwise reads negative)."""
+    import cv2
+    from physlens.hybrid import track_rigid
+    rng = np.random.default_rng(0)
+    tex = cv2.GaussianBlur((rng.random((600, 600)) * 255).astype(np.uint8), (5, 5), 0)
+    K = np.array([[800, 0, 400], [0, 800, 300], [0, 0, 1.0]])
+    frames = []
+    for i in range(40):
+        M = cv2.getRotationMatrix2D((300, 300), 0.5 * i, 1.0)
+        M[0, 2] += 100 + 0.01 * i * 800 / 5.0
+        frames.append(cv2.warpAffine(tex, M, (800, 600), borderValue=128))
+    reg = np.zeros((600, 800), bool)
+    reg[150:450, 250:550] = True
+    r = track_rigid(frames, reg, list(range(40)), K, np.array([0, 0, -1.0]), np.array([0, 0, 5.0]),
+                    np.array([1, 0, 0.]), np.array([0, 1, 0.]))
+    th, t = r["theta"][-1], r["t"][-1]
+    centre = np.array([(400 - 400) * 5 / 800, (300 - 300) * 5 / 800])       # the patch's centre at the seed frame
+    R = np.array([[np.cos(th), -np.sin(th)], [np.sin(th), np.cos(th)]])
+    assert abs(np.degrees(th) + 19.5) < 0.2
+    assert np.allclose(R @ centre + t - centre, [0.39, 0.0], atol=0.01)

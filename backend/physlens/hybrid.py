@@ -168,3 +168,154 @@ def fit_distortion(pairs, K, n, c, d, t: np.ndarray, steady: np.ndarray, up: np.
             if best is None or score < best[0]:
                 best = (score, float(k1), float(a), nn, dd)
     return {"k1": best[1], "plane_turn_deg": best[2], "relative_residual": round(best[0], 5), "n": best[3], "d": best[4]}
+
+
+def lens_from_lines(gray: np.ndarray, K: np.ndarray, mask: np.ndarray, min_len: int | None = None,
+                    k1s=np.round(np.arange(-0.4, 0.41, 0.02), 2), segments=None) -> dict:
+    """The radial term (as `radial`) that makes the scene's long straight lines straight: floor seams, slab edges.
+    Segments are found in `mask` (the floor, away from anything moving or curved), each refined to sub-pixel edge
+    points across its length, then each line's own best term is found; the median over lines is returned, so one
+    line that isn't really straight can't drag it."""
+    g = cv2.GaussianBlur(gray.astype(np.float32), (5, 5), 0)
+    gx, gy = cv2.Sobel(g, cv2.CV_32F, 1, 0, ksize=5), cv2.Sobel(g, cv2.CV_32F, 0, 1, ksize=5)
+    e = cv2.Canny(g.astype(np.uint8), 40, 120) * (mask > 0)
+    min_len = min_len or int(0.2 * min(gray.shape))
+    segs = cv2.HoughLinesP(e.astype(np.uint8), 1, np.pi / 720, 80, minLineLength=min_len, maxLineGap=12)
+    if segments is not None:                                             # rough segments given (hand-picked)
+        segs = np.asarray(segments, float).reshape(-1, 4)
+    segs = [] if segs is None else segs.reshape(-1, 4).astype(float)
+    # One per physical line: drop segments nearly collinear with a longer one already kept.
+    segs = sorted(segs, key=lambda s: -np.hypot(s[2] - s[0], s[3] - s[1]))
+    kept = []
+    for s in segs:
+        u = np.array([s[2] - s[0], s[3] - s[1]]) / np.hypot(s[2] - s[0], s[3] - s[1])
+        if any(abs(u @ ku) > 0.995 and abs((s[:2] - ks[:2]) @ np.array([-ku[1], ku[0]])) < 6 for ks, ku in kept):
+            continue
+        kept.append((s, u))
+    h, w = gray.shape
+    band = 12 if segments is not None else 6                            # hand-picked ends are rougher
+    lines = []
+    for s, u in kept:
+        nrm = np.array([-u[1], u[0]])
+        L = np.hypot(s[2] - s[0], s[3] - s[1])
+        pts = []
+        for a in np.arange(0, L, 3.0):
+            p = s[:2] + a * u
+            offs = np.arange(-band, band + 1)
+            q = p[None] + offs[:, None] * nrm[None]
+            xi, yi = np.clip(q[:, 0].round().astype(int), 0, w - 1), np.clip(q[:, 1].round().astype(int), 0, h - 1)
+            prof = np.abs(gx[yi, xi] * nrm[0] + gy[yi, xi] * nrm[1])
+            j = int(np.argmax(prof))
+            if 0 < j < len(prof) - 1:
+                a0, b0, c0 = prof[j - 1:j + 2]
+                den = a0 - 2 * b0 + c0
+                pts.append(q[j] + (0.5 * (a0 - c0) / den if den else 0.0) * nrm)
+        if len(pts) > 30:
+            lines.append(np.array(pts))
+
+    def rms(p):
+        for _ in range(2):
+            c = p.mean(0)
+            v = np.linalg.svd(p - c, full_matrices=False)[2][-1]
+            r = (p - c) @ v
+            p = p[np.abs(r) < 3 * np.median(np.abs(r)) + 0.3]
+        c = p.mean(0)
+        return float(np.sqrt(np.mean(((p - c) @ np.linalg.svd(p - c, full_matrices=False)[2][-1]) ** 2)))
+
+    best = [float(k1s[int(np.argmin([rms(radial(K, k1)(p)) for k1 in k1s]))]) for p in lines]
+    return {"k1": float(np.median(best)) if best else 0.0, "per_line": best, "lines": len(lines),
+            "segments": [[round(v) for v in s] for s, _ in kept[:len(lines)]]}
+
+
+def _rigid2d(a: np.ndarray, b: np.ndarray, thresh: float, iters: int = 200, seed: int = 0):
+    """Rotation angle and translation taking 2D points a onto b (a rigid move), RANSAC over pairs, refit on inliers
+    (Kabsch). Returns (theta, t, inlier mask)."""
+    rng = np.random.default_rng(seed)
+
+    def fit(p, q):
+        pc, qc = p.mean(0), q.mean(0)
+        H = (p - pc).T @ (q - qc)
+        th = np.arctan2(H[0, 1] - H[1, 0], H[0, 0] + H[1, 1])
+        R = np.array([[np.cos(th), -np.sin(th)], [np.sin(th), np.cos(th)]])
+        return th, qc - R @ pc, R
+
+    best = None
+    for _ in range(iters):
+        i, j = rng.choice(len(a), 2, replace=False)
+        th, t, R = fit(a[[i, j]], b[[i, j]])
+        inl = np.linalg.norm(a @ R.T + t - b, axis=1) < thresh
+        if best is None or inl.sum() > best.sum():
+            best = inl
+    th, t, R = fit(a[best], b[best])
+    inl = np.linalg.norm(a @ R.T + t - b, axis=1) < thresh
+    th, t, _ = fit(a[inl], b[inl])
+    return float(th), t, inl
+
+
+def track_rigid(gray: list[np.ndarray], region0: np.ndarray, frames: list[int], K: np.ndarray, n: np.ndarray,
+                c: np.ndarray, e1: np.ndarray, e2: np.ndarray, height0: np.ndarray | None = None, undistort=None,
+                max_pts: int = 400, min_pts: int = 80, fb_px: float = 0.7, thresh_m: float = 0.01) -> dict:
+    """A rigid body that slides and turns on a plane, followed through `frames` (indices into `gray`, in order; the
+    first is the seed). Features in `region0` (the body in the seed frame) are followed in the image; each one's ray
+    meets the plane (moved along n by its height in `height0`, a per-pixel map at the seed frame), giving 2D points
+    (along e1, e2) in metres; the body's move per step is the rigid move that best takes them from one frame to the
+    next (RANSAC, `thresh_m`). The region and heights are carried by the body's image motion as features are lost
+    and re-seeded. Returns per frame the body's pose (turn angle, and where the seed frame's plane origin went):
+    a point x (2D, seed frame) is at R(theta) x + t."""
+    lk = dict(winSize=(21, 21), maxLevel=4, criteria=(cv2.TERM_CRITERIA_EPS | cv2.TERM_CRITERIA_COUNT, 30, 0.01))
+    undistort = undistort or (lambda p: p)
+    h, w = gray[frames[0]].shape
+    A = np.eye(3)                                    # seed-frame pixels -> current pixels (similarity)
+    th, t = 0.0, np.zeros(2)
+    out_th, out_t, used = [0.0], [t.copy()], [0]
+
+    def carried(m, fill):
+        return cv2.warpAffine(m, A[:2].astype(np.float32), (w, h), flags=cv2.INTER_NEAREST, borderValue=fill)
+
+    def seed(i):
+        m = carried(region0.astype(np.uint8), 0)
+        p = cv2.goodFeaturesToTrack(gray[i], maxCorners=max_pts, qualityLevel=0.01, minDistance=5, mask=m * 255)
+        return np.zeros((0, 1, 2), np.float32) if p is None else p.astype(np.float32)
+
+    def on_plane(p, hm):
+        off = 0.0 if hm is None else hm[np.clip(p[:, 1].astype(int), 0, h - 1), np.clip(p[:, 0].astype(int), 0, w - 1)]
+        X = plane_point(undistort(p), K, n, c, off)
+        return np.c_[X @ e1, X @ e2], (np.isfinite(off) if hm is not None else np.ones(len(p), bool))
+
+    pts = seed(frames[0])
+    for a, b in zip(frames[:-1], frames[1:]):
+        if len(pts) < min_pts:
+            more = seed(a)
+            pts = np.concatenate([pts, more]) if len(pts) else more
+        ok_step = False
+        if len(pts) >= 8:
+            nxt, st, _ = cv2.calcOpticalFlowPyrLK(gray[a], gray[b], pts, None, **lk)
+            back, st2, _ = cv2.calcOpticalFlowPyrLK(gray[b], gray[a], nxt, None, **lk)
+            ok = (st.ravel() == 1) & (st2.ravel() == 1) & (np.linalg.norm((back - pts).reshape(-1, 2), axis=1) < fb_px)
+            p0, p1 = pts.reshape(-1, 2)[ok], nxt.reshape(-1, 2)[ok]
+            hm = None if height0 is None else carried(height0.astype(np.float32), np.nan)
+            if len(p0) >= 8:
+                q0, f0 = on_plane(p0, hm)
+                q1, _ = on_plane(p1, hm)
+                keep = f0 & np.isfinite(q0).all(1) & np.isfinite(q1).all(1)
+                p0, p1, q0, q1 = p0[keep], p1[keep], q0[keep], q1[keep]
+            if len(p0) >= 8:
+                dth, dt, inl = _rigid2d(q0, q1, thresh_m)
+                if inl.sum() >= 8:
+                    R = np.array([[np.cos(dth), -np.sin(dth)], [np.sin(dth), np.cos(dth)]])
+                    th, t = th + dth, R @ t + dt
+                    M, _ = cv2.estimateAffinePartial2D(p0[inl], p1[inl], method=cv2.LMEDS)
+                    if M is not None:
+                        A = np.r_[M, [[0, 0, 1]]] @ A
+                    m = carried(region0.astype(np.uint8), 0) > 0
+                    inside = m[np.clip(p1[inl, 1].astype(int), 0, h - 1), np.clip(p1[inl, 0].astype(int), 0, w - 1)]
+                    pts = p1[inl][inside].reshape(-1, 1, 2).astype(np.float32)
+                    out_th.append(th); out_t.append(t.copy()); used.append(int(inl.sum()))
+                    ok_step = True
+        if not ok_step:
+            out_th.append(np.nan); out_t.append(np.full(2, np.nan)); used.append(0)
+            pts = np.zeros((0, 1, 2), np.float32)
+            break                                    # lost: stop rather than guess
+    pad = len(frames) - len(out_th)
+    return {"theta": np.r_[out_th, [np.nan] * pad], "t": np.r_[np.array(out_t), np.full((pad, 2), np.nan)],
+            "features": np.r_[used, [0] * pad]}

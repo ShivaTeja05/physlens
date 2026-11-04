@@ -21,6 +21,9 @@ All footage is public (NHTSA, NASA, Wikimedia Commons; see each `datasets/*/SOUR
 | | | Jeep's speed change **+47.4 km/h** (100–200 ms); its curve within ~1–4 km/h from 0 to 170 ms | +47.8 km/h (accelerometers) | |
 | | | F-150's speed change −35.8 km/h; within ~2.5 km/h from 120 to 200 ms, low at 80–100 ms (cab at the picture's edge), up to 12% high after 220 ms | −34.0 km/h | |
 | | | momentum: Jeep gained ÷ F-150 lost = **0.954** | 1.013 from the accelerometers | |
+| NHTSA 7371: Yaris at 113 km/h into a standing Yaris, 15°, both turning (in progress) | overhead wide, 1,000 fps (`yaris7371.py`, rigid bodies that turn) | approach 99.8 km/h (lens from floor seams, k1 −0.12) / 104.0 (no lens fix); 17 frames at the picture's edge | 113.0 km/h | `yaris7371.py` |
+| | | struck car's speed change in its own axes at 100 / 150 ms: X −51.6 / −46.6, Y +16.2 / +18.5 (k1 −0.12); X −59.2 / −57.4, Y +18.1 / +21.8 (no fix) | X −58.4 / −57.5, Y +22.9 / +19.9 (accelerometers) | |
+| | | not yet reliable: the lens can't be calibrated from this floor's seams (line by line k1 −0.40 to +0.34) | | |
 | NHTSA 9001: barrier cart into a parked Camry | real-time rear view, 30 fps | parked Camry 4.54–4.78 m (lens range); Muse Spark: Camry, 4.869 m | 4.85 m | `side9001_3d.py` |
 | | | cart 25–33 km/h ✗ | 62.19 km/h | |
 
