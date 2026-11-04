@@ -1,7 +1,7 @@
 """Calls the MapAnything GPU worker and maps its outputs back to original image pixels.
 
-Two backends: RunPod Serverless (RUNPOD_ENDPOINT_ID + RUNPOD_API_KEY in backend/.env, see physlens/gpu_worker)
-or Modal (physlens/geometry/modal_app.py). Images are resized here to a size MapAnything accepts (multiples of
+The worker runs on RunPod Serverless (RUNPOD_ENDPOINT_ID + RUNPOD_API_KEY in backend/.env, see gpu_worker/).
+Images are resized here to a size MapAnything accepts (multiples of
 14, about 518 px wide), so original pixels map to model pixels by a plain scale per axis, with no hidden crop.
 """
 from __future__ import annotations
@@ -107,16 +107,10 @@ def _runpod(encoded: list[bytes], size: tuple[int, int], timeout_s: float = 600,
     return views
 
 
-def _modal(encoded: list[bytes], size: tuple[int, int]) -> list[dict]:
-    import modal
-
-    return modal.Cls.from_name("physlens-geometry", "Geometry")().reconstruct.remote(encoded, size)
-
-
-def backend() -> str:
-    if os.environ.get("RUNPOD_ENDPOINT_ID") and os.environ.get("RUNPOD_API_KEY"):
-        return "runpod"
-    return "modal"
+def _require_worker() -> None:
+    if not (os.environ.get("RUNPOD_ENDPOINT_ID") and os.environ.get("RUNPOD_API_KEY")):
+        raise RuntimeError("3D needs the GPU worker: set RUNPOD_ENDPOINT_ID and RUNPOD_API_KEY in backend/.env "
+                           "(see gpu_worker/README.md)")
 
 
 def reconstruct(images: list[np.ndarray | Image.Image], target_width: int = 518, timeout_s: float = 600,
@@ -143,9 +137,8 @@ def reconstruct(images: list[np.ndarray | Image.Image], target_width: int = 518,
             if camera_poses is not None:
                 ex["camera_pose"] = np.array(camera_poses[i], float).tolist()
             extras.append(ex)
-    if extras and backend() != "runpod":
-        raise NotImplementedError("intrinsics/poses are only wired for the RunPod worker")
-    results = _runpod(encoded, size, timeout_s, extras) if backend() == "runpod" else _modal(encoded, size)
+    _require_worker()
+    results = _runpod(encoded, size, timeout_s, extras)
     views = []
     for r in results:
         mw, mh = r["model_size"]
@@ -169,6 +162,8 @@ def sharp_depth(images: list[np.ndarray], fov_x: list[float] | float | None = No
     """MoGe-3 on the RunPod worker, a few images per job (each image's maps are about a megabyte compressed).
     `fov_x` (degrees): give MapAnything's field of view so both models use the same lens."""
     import httpx
+
+    _require_worker()
 
     endpoint, key = os.environ["RUNPOD_ENDPOINT_ID"], os.environ["RUNPOD_API_KEY"]
     headers = {"Authorization": f"Bearer {key}"}

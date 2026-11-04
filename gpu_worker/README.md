@@ -28,7 +28,3 @@ Returns one compressed `npz` per view: `depth_z` (m), `conf`, `mask`, `intrinsic
 ```
 Returns per image: `depth` (m), `mask`, `normal` (int8 ×127), `intrinsics` (pixels). PhysLens aligns it to
 MapAnything's depth and lifts it with MapAnything's camera poses, for full-resolution point clouds.
-
-## Other files
-`boot.sh` and `runpod_deploy.py` are an earlier install-at-startup setup kept for reference. Don't use them; RunPod
-stops the container before the install finishes.

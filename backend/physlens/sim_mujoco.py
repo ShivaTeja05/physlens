@@ -16,7 +16,6 @@ The fitted model is written out as MJCF, so the same event opens in any MuJoCo v
 from __future__ import annotations
 
 import math
-from typing import Optional
 
 import numpy as np
 from scipy.optimize import least_squares

@@ -9,7 +9,6 @@ Writes benchmark/results.json and benchmark/RESULTS.md. Uses the Meta Model API 
 from __future__ import annotations
 
 import json
-import math
 import re
 import sys
 import time
