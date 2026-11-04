@@ -1,0 +1,17 @@
+# PhysLens engine (Python 3.11). Versions are the ones the tests pass with.
+numpy==2.4.6
+scipy==1.17.1
+opencv-python-headless==5.0.0.93
+pillow==13.0.0
+fastapi==0.162.0
+uvicorn[standard]==0.54.0
+python-multipart==0.0.33
+pydantic==2.14.2
+httpx==0.28.1
+websockets==17.4
+openai==3.42.1
+meta-sam-parser==0.1.0
+python-dotenv==1.2.4
+imageio-ffmpeg==0.8.0
+mujoco==3.17.0
+pytest==9.2.0
