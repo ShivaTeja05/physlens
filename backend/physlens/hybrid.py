@@ -20,10 +20,11 @@ import cv2
 import numpy as np
 
 
-def plane_point(px: np.ndarray, K: np.ndarray, n: np.ndarray, c: np.ndarray) -> np.ndarray:
-    """Where the rays through pixels `px` (N, 2) meet the plane through `c` with normal `n` (camera frame)."""
+def plane_point(px: np.ndarray, K: np.ndarray, n: np.ndarray, c: np.ndarray, offset=0.0) -> np.ndarray:
+    """Where the rays through pixels `px` (N, 2) meet the plane through `c` with unit normal `n` (camera frame),
+    moved `offset` along n (a number, or one per pixel: points of a body at different heights)."""
     rays = np.c_[(px[:, 0] - K[0, 2]) / K[0, 0], (px[:, 1] - K[1, 2]) / K[1, 1], np.ones(len(px))]
-    s = (c @ n) / (rays @ n)
+    s = (c @ n + offset) / (rays @ n)
     return rays * s[:, None]
 
 
@@ -55,10 +56,12 @@ def fit_side_plane(P: np.ndarray, d: np.ndarray, iters: int = 300, thresh: float
 
 def track_part(gray: list[np.ndarray], region_at, start: int, end: int, K: np.ndarray, n: np.ndarray, c: np.ndarray,
                d: np.ndarray, max_pts: int = 300, min_pts: int = 60, fb_px: float = 0.7, scale: float = 1.0,
-               undistort=None) -> dict:
+               undistort=None, height_at=None) -> dict:
     """Follow a rigid part from frame `start` to `end` (indices into `gray`). `region_at(i, shift_px)` gives the
-    part's mask in frame i (it may use the part's accumulated image shift to move a seed region along). Returns
-    per frame: the part's move along `d` in metres (on the plane), the features used and the image shift."""
+    part's mask in frame i (it may use the part's accumulated image shift to move a seed region along). With
+    `height_at(i, shift_px)` (a per-pixel map of heights along n above the plane), each feature moves in its own
+    plane at its own height, so a part spanning heights (a cab's roof and windscreen) isn't measured on one.
+    Returns per frame: the part's move along `d` in metres, the features used and the image shift."""
     lk = dict(winSize=(21, 21), maxLevel=4, criteria=(cv2.TERM_CRITERIA_EPS | cv2.TERM_CRITERIA_COUNT, 30, 0.01))
     undistort = undistort or (lambda p: p)
     pairs: list = []
@@ -90,8 +93,19 @@ def track_part(gray: list[np.ndarray], region_at, start: int, end: int, K: np.nd
             pairs.append(None)
             pts = np.zeros((0, 1, 2), np.float32)
             continue
+        off = 0.0
+        if height_at is not None:
+            hm = height_at(i - 1, shift)
+            off = hm[np.clip(p0[:, 1].astype(int), 0, hm.shape[0] - 1), np.clip(p0[:, 0].astype(int), 0, hm.shape[1] - 1)]
+            keep = np.isfinite(off)
+            p0, p1, off = p0[keep], p1[keep], off[keep]
+            if len(p0) < 8:
+                along.append(along[-1]); used.append(int(len(p0))); shifts.append(shift.copy())
+                pairs.append(None)
+                pts = np.zeros((0, 1, 2), np.float32)
+                continue
         pairs.append((p0, p1))
-        X0, X1 = plane_point(undistort(p0), K, n, c), plane_point(undistort(p1), K, n, c)
+        X0, X1 = plane_point(undistort(p0), K, n, c, off), plane_point(undistort(p1), K, n, c, off)
         step = float(np.median((X1 - X0) @ d)) * scale
         along.append(along[-1] + step)
         used.append(int(len(p0)))

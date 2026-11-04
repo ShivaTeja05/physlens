@@ -17,6 +17,10 @@ All footage is public (NHTSA, NASA, Wikimedia Commons; see each `datasets/*/SOUR
 | | | 0.36 m further towards the pole, stops at 65 ms; turns 35° by 300 ms | (accelerometers not yet compared) | |
 | | 3D world (`pole_world.py`) | the car's body moved by that measurement; at 300 ms it sits a median 0.21 m from the car's measured points (the struck side is crushed; the turn's pivot is approximate) | | |
 | 11foot8 bridge: box truck under a 3.556 m beam | street pole camera, 30 fps | impact found at frame 196.6; beam clearance 3.63 m | hand label 196–200; sign 3.556 m | `world_events.py` |
+| NHTSA 8555: Ford F-150 (2,674 kg) into the rear of a standing Jeep Liberty (1,927 kg) | overhead, 1,000 fps (`rear8555.py`) | approach **69.09 km/h** | 69.1 km/h (speed trap) | `rear8555.py` |
+| | | Jeep's speed change **+47.4 km/h** (100–200 ms); its curve within ~1–4 km/h from 0 to 170 ms | +47.8 km/h (accelerometers) | |
+| | | F-150's speed change −35.8 km/h; within ~2.5 km/h from 120 to 200 ms, low at 80–100 ms (cab at the picture's edge), up to 12% high after 220 ms | −34.0 km/h | |
+| | | momentum: Jeep gained ÷ F-150 lost = **0.954** | 1.013 from the accelerometers | |
 | NHTSA 9001: barrier cart into a parked Camry | real-time rear view, 30 fps | parked Camry 4.54–4.78 m (lens range); Muse Spark: Camry, 4.869 m | 4.85 m | `side9001_3d.py` |
 | | | cart 25–33 km/h ✗ | 62.19 km/h | |
 
@@ -29,6 +33,9 @@ All footage is public (NHTSA, NASA, Wikimedia Commons; see each `datasets/*/SOUR
 - **Merging two cameras through AI depth** (9070 left + right, and the edited web video mistaken for a camera).
 
 ## What made the hybrid work
+- **Lens from straight floor lines** when the motion covers only part of the picture (8555: the physics fit sat at
+  its search edge); **each feature at its own height** when a tracked part spans several (a cab's roof and hood),
+  and **no glass** (it shows the room's reflection).
 - A **plane from the scene**, not from AI depth: the car's side from its wheels' apparent sizes (9070; the AI plane
   was 52° off), the roof seen from overhead (15756).
 - **Rigid parts only**: above the wheels (rolling tyres read slow), the side away from the impact.
