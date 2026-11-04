@@ -103,10 +103,14 @@ class Track3D:
     info: dict = field(default_factory=dict)
 
 
-def track(video: Path, idx: list[int], prompt: str, cache: Path, width: int = 960) -> tuple[Track3D, list, list]:
+def track(video: Path, idx: list[int], prompt: str, cache: Path, width: int = 960,
+          sam_video: bool = False) -> tuple[Track3D, list, list]:
+    """sam_video: SAM 3.1 video tracking over the keyframes (one identity through the clip) instead of a text
+    prompt per keyframe."""
     frames, fps = read_at(video, idx, width)
     views = geometry(frames, cache / "mapanything.npz")
-    ms = masks(frames, prompt, cache / f"sam_{prompt.replace(' ', '_')}")
+    tag = prompt.replace(' ', '_')
+    ms = video_masks(frames, prompt, cache / f"samvideo_{tag}") if sam_video else masks(frames, prompt, cache / f"sam_{tag}")
     T, finfo = floor_frame(views, [v.camera_pose for v in views])
     keep, P, clouds = [], [], []
     for j, (v, m) in enumerate(zip(views, ms)):
@@ -119,7 +123,8 @@ def track(video: Path, idx: list[int], prompt: str, cache: Path, width: int = 96
         keep.append(j)
         clouds.append(g)
         P.append(np.median(g, axis=0))
-    info = {**finfo, "keyframes": len(idx), "seen": len(keep), "prompt": prompt}
+    info = {**finfo, "keyframes": len(idx), "seen": len(keep), "prompt": prompt,
+            "segmentation": "SAM 3.1 video tracking" if sam_video else "SAM 3.1 per keyframe"}
     tr = Track3D([idx[j] for j in keep], np.array([idx[j] for j in keep]) / fps, np.array(P), clouds, T, info=info)
     return tr, frames, views
 
@@ -145,3 +150,74 @@ def speeds(tr: Track3D, window: int = 3) -> tuple[np.ndarray, np.ndarray]:
 def save(tr: Track3D, out: Path, extra: dict) -> None:
     out.write_text(json.dumps({"frames": tr.frames, "t": tr.t.round(4).tolist(), "p": tr.p.round(4).tolist(),
                                "info": tr.info, **extra}, indent=1))
+
+
+def video_masks(frames: list[np.ndarray], prompt: str, cache: Path, fps: float = 8.0) -> list[np.ndarray | None]:
+    """SAM 3.1 *video* tracking over the keyframes (sent as one short clip): the object keeps one identity through
+    the whole clip, so it is followed through changes a per-frame text prompt misses (a truck whose roof is torn
+    open, a car turning side-on). Masks are cached as PNGs, one per keyframe."""
+    import subprocess
+    import tempfile
+
+    from meta_sam_parser import CompletedOutcome, decode_mask_to_raster, video_segmentation_format
+
+    from .perception.sam_tracker import SamTracker
+    from .synth import ffmpeg_exe
+
+    cache.mkdir(parents=True, exist_ok=True)
+    pngs = [cache / f"{j:03d}.png" for j in range(len(frames))]
+    if all(p.exists() for p in pngs):
+        out = []
+        for p in pngs:
+            m = cv2.imread(str(p), cv2.IMREAD_GRAYSCALE) > 0
+            out.append(m if m.any() else None)
+        return out
+    h, w = frames[0].shape[:2]
+    with tempfile.TemporaryDirectory() as tmp:
+        clip = Path(tmp) / "keys.mp4"
+        # Baseline H.264 without B-frames and a 90 kHz timebase: SAM then counts exactly one frame per keyframe.
+        proc = subprocess.Popen([ffmpeg_exe(), "-y", "-loglevel", "error", "-f", "rawvideo", "-pix_fmt", "bgr24",
+                                 "-s", f"{w}x{h}", "-r", str(fps), "-i", "-", "-an", "-c:v", "libx264", "-profile:v",
+                                 "baseline", "-bf", "0", "-pix_fmt", "yuv420p", "-crf", "18",
+                                 "-video_track_timescale", "90000", str(clip)], stdin=subprocess.PIPE)
+        for f in frames:
+            proc.stdin.write(np.ascontiguousarray(f).tobytes())
+        proc.stdin.close()
+        proc.wait()
+        sam = SamTracker()
+        text = sam._segment(sam._upload(clip), prompt, n_frames=len(frames))
+    parser = video_segmentation_format().create_parser()
+    for _ in parser.push(text):
+        pass
+    records = [r for r in parser.finish(CompletedOutcome()).result.records if r.kind == "mask"]
+    counts: dict[str, int] = {}
+    for r in records:
+        counts[r.object_id] = counts.get(r.object_id, 0) + 1
+    out: list[np.ndarray | None] = [None] * len(frames)
+    if counts:
+        target = max(counts, key=counts.get)
+        for r in records:
+            i = r.frame.frame_index
+            if r.object_id != target or not 0 <= i < len(frames):
+                continue
+            raster = np.frombuffer(decode_mask_to_raster(r.mask), dtype=np.uint8).reshape(r.mask.height, r.mask.width)
+            m = np.zeros((h, w), bool)
+            t, l = int(r.bounds.top), int(r.bounds.left)
+            hh, ww = min(raster.shape[0], h - t), min(raster.shape[1], w - l)
+            m[t:t + hh, l:l + ww] = raster[:hh, :ww] > 0
+            out[i] = m if m.any() else None
+    for p, m in zip(pngs, out):
+        cv2.imwrite(str(p), (m if m is not None else np.zeros((h, w), bool)).astype(np.uint8) * 255)
+    return out
+
+
+def static_points(view, mask: np.ndarray | None, T: np.ndarray, scale: float = 1.0, step: int = 2) -> np.ndarray:
+    """The world around the object in one keyframe (MapAnything points outside its mask, ground frame)."""
+    h, w = view.depth.shape
+    out = np.ones((h, w), bool)
+    if mask is not None:
+        m = cv2.resize(mask.astype(np.uint8), (w, h), interpolation=cv2.INTER_NEAREST)
+        out &= cv2.dilate(m, np.ones((7, 7), np.uint8)) == 0
+    P = view.points_world[::step, ::step][out[::step, ::step]]
+    P = P[np.isfinite(P).all(1)]
+    return (P @ T[:3, :3].T + T[:3, 3]) * scale

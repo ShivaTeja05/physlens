@@ -18,6 +18,8 @@ import numpy as np
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "backend"))
+from dotenv import load_dotenv   # noqa: E402
+load_dotenv(ROOT / "backend" / ".env")
 from physlens.vehicle3d import read_at, rescale, track   # noqa: E402
 
 CLIPS = ROOT / "datasets" / "commons"
@@ -60,43 +62,131 @@ def underside(view, mask: np.ndarray, T: np.ndarray) -> tuple[float, float, floa
     return float(np.median(edge)), float(np.percentile(edge, 25)), float(np.percentile(edge, 75))
 
 
+def two_phase(t: np.ndarray, u: np.ndarray, t_lo: float, t_hi: float) -> dict:
+    """Distance along the road fitted with physics instead of frame differences: steady braking (or speeding up)
+    until the impact at t_i, then a steady deceleration a2 to a stop. Position and speed are continuous at t_i;
+    t_i is chosen by the fit (grid over [t_lo, t_hi]); ± from the fit's covariance."""
+    from scipy.optimize import least_squares
+
+    def model(th, ti, tt):
+        s0, v0, a1, a2 = th
+        t0 = t[0]
+        pre = s0 + v0 * (tt - t0) + 0.5 * a1 * (tt - t0) ** 2
+        si, vi = s0 + v0 * (ti - t0) + 0.5 * a1 * (ti - t0) ** 2, v0 + a1 * (ti - t0)
+        tau = np.clip(tt - ti, 0, max(vi, 1e-6) / max(a2, 1e-6))
+        post = si + vi * tau - 0.5 * a2 * tau ** 2
+        return np.where(tt < ti, pre, post)
+
+    best = None
+    for ti in np.arange(t_lo, t_hi + 1e-9, 0.01):
+        r = least_squares(lambda th: model(th, ti, t) - u, [u[0], 5.0, 0.0, 3.0],
+                          bounds=([-np.inf, 0, -20, 0.01], [np.inf, 30, 20, 100]))
+        rss = float(r.fun @ r.fun)
+        if best is None or rss < best[0]:
+            best = (rss, ti, r)
+    rss, ti, r = best
+    dof = max(len(u) - 5, 1)
+    cov = rss / dof * np.linalg.pinv(r.jac.T @ r.jac)
+    s0, v0, a1, a2 = r.x
+    vi = v0 + a1 * (ti - t[0])
+    J = np.array([0, 1, ti - t[0], 0])                    # d vi / d theta
+    vi_err = float(np.sqrt(J @ cov @ J))
+    return {"impact_t": round(float(ti), 3), "speed_at_impact_ms": round(float(vi), 2), "speed_at_impact_err_ms": round(vi_err, 2),
+            "approach_accel_ms2": round(float(a1), 2), "approach_accel_err_ms2": round(float(np.sqrt(cov[2, 2])), 2),
+            "speed_at_start_ms": round(float(v0), 2),
+            "ride_down_decel_ms2": round(float(a2), 2), "ride_down_decel_err_ms2": round(float(np.sqrt(cov[3, 3])), 2),
+            "ride_down_distance_m": round(float(vi ** 2 / (2 * a2)), 2), "ride_down_time_s": round(float(vi / a2), 2),
+            "fit_rms_m": round(float(np.sqrt(rss / len(u))), 3), "fitted": model(r.x, ti, t).round(3).tolist()}
+
+
+def speed_curve(t: np.ndarray, u: np.ndarray, step: float = 0.4, smooth: float = 0.5):
+    """Speed as a continuous piecewise-linear curve (knots every `step` s), fitted to every position at once:
+    position = start + ∫ speed. A light penalty on changes of acceleration keeps it physical. Returns a function
+    giving speed and its ± (from the fit's covariance) at any time, and the fit's position residual."""
+    knots = np.arange(t.min(), t.max() + step, step)
+
+    def basis(tt):
+        # Column k: ∫ from t0 to tt of the k-th hat function (linear interpolation weight of knot k).
+        out = np.zeros((len(tt), len(knots)))
+        fine = np.linspace(t.min(), t.max(), 2000)
+        hats = np.stack([np.interp(fine, knots, np.eye(len(knots))[k]) for k in range(len(knots))], 1)
+        cum = np.vstack([np.zeros(len(knots)), np.cumsum((hats[1:] + hats[:-1]) / 2 * np.diff(fine)[:, None], 0)])
+        for k in range(len(knots)):
+            out[:, k] = np.interp(tt, fine, cum[:, k])
+        return out
+
+    A = np.hstack([np.ones((len(t), 1)), basis(t)])
+    D = np.diff(np.eye(len(knots)), 2, axis=0)          # second differences of speed (changes of acceleration)
+    R = np.hstack([np.zeros((len(D), 1)), D]) * smooth
+    theta, *_ = np.linalg.lstsq(np.vstack([A, R]), np.r_[u, np.zeros(len(D))], rcond=None)
+    res = u - A @ theta
+    sigma2 = float(res @ res) / max(len(u) - len(knots) - 1, 1)
+    cov = sigma2 * np.linalg.pinv(A.T @ A + R.T @ R)
+
+    def v(tt):
+        tt = np.atleast_1d(tt)
+        W = np.stack([np.interp(tt, knots, np.eye(len(knots))[k]) for k in range(len(knots))], 1)
+        W = np.hstack([np.zeros((len(tt), 1)), W])
+        return W @ theta, np.sqrt(np.einsum("ij,jk,ik->i", W, cov, W))
+
+    return v, float(np.sqrt(np.mean(res ** 2)))
+
+
 def truck() -> dict:
-    tr, frames, views = track(CLIPS / "truck-11foot8" / "clip.mp4", list(range(100, 248, 4)), "box truck", CACHE / "truck2")
+    idx = list(range(100, 248, 4))
+    tr, frames, views = track(CLIPS / "truck-11foot8" / "clip.mp4", idx, "box truck", CACHE / "truck2", sam_video=True)
     bridge = cv2.imread(str(CACHE / "truck2" / "bridge.png"), cv2.IMREAD_GRAYSCALE) > 0     # SAM 3.1, prompt "bridge"
     u_med, u_lo, u_hi = underside(views[-1], bridge, tr.T_ground)
-    tm, v = speed_series(tr)
-    # The stop: the first keyframe after which the truck moves less than 0.1 (scene units) per keyframe for good.
-    steps = np.linalg.norm(np.diff(tr.p[:, [0, 2]], axis=0), axis=1)
-    moving = steps > 0.12
-    stop = int(np.nonzero(moving)[0][-1]) + 1 if moving.any() else len(tr.p) - 1
-    roof_scene = float(np.percentile(tr.clouds[stop][:, 1], 98))
     rescale(tr, CLEARANCE_M / u_med, f"bridge underside = {CLEARANCE_M} m")
+    # Keyframes where the truck is cut off by the image edge are left out.
+    masks = [cv2.imread(str(CACHE / "truck2" / "samvideo_box_truck" / f"{idx.index(f):03d}.png"), cv2.IMREAD_GRAYSCALE) > 0 for f in tr.frames]
+    whole = np.array([not (m[:3].any() or m[-3:].any() or m[:, :3].any() or m[:, -3:].any()) for m in masks])
+    H = tr.p[:, [0, 2]]
+    k0 = int(np.argmax(whole))
+    d = H[-1] - H[k0]
+    d /= np.linalg.norm(d)
+    # The rear face: the camera sees it in every frame (the median of the visible surface slides backwards as the
+    # side and roof go out of view, which looks like braking that isn't there).
+    rear = np.array([np.percentile((c[:, [0, 2]] - H[k0]) @ d, 3) for c in tr.clouds])
+    t = tr.t
+    v, rms = speed_curve(t[whole], rear[whole])
+    # Contact: the box is intact at frame 196 and its roof is being peeled at frame 200 (SAM keeps tracking it).
+    t_contact = (196 + 200) / 2 / 29.97
+    grid = np.arange(t[whole].min(), t[whole].max() + 1e-9, 1 / 29.97)
+    vg, eg = v(grid)
+    moving = vg > 0.3
+    t_stop = float(grid[np.nonzero(moving)[0][-1]]) if moving.any() else float(grid[-1])
+    cruise = (grid < 5.4)
+    vc, ec = v(t_contact)
+    brake = (grid > 5.4) & (grid < t_contact)
+    decel = -np.polyfit(grid[brake], vg[brake], 1)[0] if brake.sum() > 3 else float("nan")
+    after = float(np.interp(t_stop, t[whole], rear[whole]) - np.interp(t_contact, t[whole], rear[whole]))
     hd = headings(tr.p)
-    widths = [extents(c, h)[1] for c, h in zip(tr.clouds[:stop], hd[:stop])]
+    k_c = int(np.searchsorted(t, t_contact))
+    widths = [extents(c, h)[1] for c, h, w in zip(tr.clouds[:k_c], hd[:k_c], whole[:k_c]) if w]
+    roofs = [float(np.percentile(c[:, 1], 98)) for c, w in zip(tr.clouds[:k_c], whole[:k_c]) if w]
     cam_h = float(tr.T_ground[1, :3] @ views[0].camera_pose[:3, 3] + tr.T_ground[1, 3]) * tr.scale
-    # Approach speed: straight-line fit of distance travelled vs time over the approach (before the last 3 keyframes
-    # of motion, where it brakes and hits).
-    s = np.r_[0, np.cumsum(np.linalg.norm(np.diff(tr.p[:, [0, 2]], axis=0), axis=1))]
-    a = slice(0, max(stop - 3, 4))
-    A = np.stack([tr.t[a], np.ones(len(tr.t[a]))], 1)
-    coef, res, *_ = np.linalg.lstsq(A, s[a], rcond=None)
-    sig = np.sqrt(res[0] / max(len(s[a]) - 2, 1)) if len(res) else 0.0
-    v_err = sig / np.sqrt(((tr.t[a] - tr.t[a].mean()) ** 2).sum())
-    v_last = float(np.linalg.norm(tr.p[stop, [0, 2]] - tr.p[stop - 2, [0, 2]]) / (tr.t[stop] - tr.t[stop - 2]))
-    return {"frames": tr.frames, "t": tr.t.round(3).tolist(), "p": tr.p.round(3).tolist(),
-            "speed_t": tm.round(3).tolist(), "speed_ms": (v * tr.scale).round(2).tolist(),
-            "last_frame_before_impact": tr.frames[stop], "impact_between_frames": [tr.frames[stop], tr.frames[stop] + 4],
+    tm, vv = speed_series(tr)
+    KM = KMH
+    return {"frames": tr.frames, "t": t.round(3).tolist(), "p": tr.p.round(3).tolist(), "rear_m": rear.round(3).tolist(),
+            "used_in_fit": whole.tolist(), "speed_t": tm.round(3).tolist(), "speed_ms": vv.round(2).tolist(),
+            "speed_curve": {"t": grid.round(3).tolist(), "kmh": (vg * KM).round(1).tolist(), "err_kmh": (eg * KM).round(1).tolist()},
             "scale": round(tr.scale, 4), "underside_scene_units": [round(u_med, 3), round(u_lo, 3), round(u_hi, 3)],
-            "check_roof_m": round(roof_scene * tr.scale, 2), "check_roof_expected": f"> {CLEARANCE_M} m (it hit the beam)",
+            "cruise_kmh": round(float(np.mean(vg[cruise])) * KM, 1) if cruise.any() else None,
+            "braking_decel_ms2": round(float(decel), 2),
+            "contact_t": round(t_contact, 3), "contact_frames": [196, 200],
+            "speed_at_contact_kmh": round(float(vc[0]) * KM, 1), "speed_at_contact_err_kmh": round(float(ec[0]) * KM, 1),
+            "stop_t": round(t_stop, 2), "distance_after_contact_m": round(after, 2),
+            "mean_decel_after_contact_ms2": round(float(vc[0]) ** 2 / (2 * after), 2) if after > 0.05 else None,
+            "fit_rms_m": round(rms, 3),
+            "check_roof_m": round(float(np.median(roofs)), 2), "check_roof_expected": f"> {CLEARANCE_M} m (it hit the beam)",
             "camera_height_m": round(cam_h, 2),
             "check_box_width_m": round(float(np.median(widths)), 2), "check_box_width_expected_m": BOX_WIDTH_M,
-            "approach_speed_ms": round(float(coef[0]), 2), "approach_speed_err_ms": round(float(v_err), 2),
-            "approach_speed_kmh": round(float(coef[0]) * KMH, 1),
-            "speed_last_8_frames_before_stop_kmh": round(v_last * KMH, 1), "info": tr.info}
+            "info": tr.info}
 
 
 def rally() -> dict:
-    tr, frames, views = track(CLIPS / "rally-latvala" / "clip.mp4", list(range(164, 186, 2)), "rally car", CACHE / "rally")
+    tr, frames, views = track(CLIPS / "rally-latvala" / "clip.mp4", list(range(164, 186, 2)), "rally car", CACHE / "rally", sam_video=True)
     hd = headings(tr.p)
     # Side-on frames: the car's heading is at right angles to the line from the camera to the car.
     cams = np.array([tr.T_ground[:3, :3] @ views[[164 + 2 * j for j in range(11)].index(f)].camera_pose[:3, 3]
@@ -146,8 +236,10 @@ def main():
     (ROOT / "benchmark" / "real_vehicles.json").write_text(json.dumps(res, indent=1))
     for k in res:
         overlay(k, res[k], [])
-        print(k, json.dumps({x: y for x, y in res[k].items() if x not in ("t", "p", "speed_t", "speed_ms", "frames")}, indent=1))
-        print("  speeds km/h:", [round(s * KMH) for s in res[k]["speed_ms"]])
+        print(k, json.dumps({x: y for x, y in res[k].items() if x not in ("t", "p", "speed_t", "speed_ms", "frames", "along_m", "rear_m", "used_in_fit", "speed_curve")
+                             and not (isinstance(y, dict) and "fitted" in y)}, indent=1))
+
+        print("  speeds km/h (frame to frame):", [round(s * KMH) for s in res[k]["speed_ms"]])
 
 
 if __name__ == "__main__":

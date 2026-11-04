@@ -1,4 +1,16 @@
-"""RunPod Serverless handler: images in, metric 3D geometry out (Meta MapAnything, Apache-2.0 weights).
+"""RunPod Serverless handler: images in, metric 3D geometry out.
+
+Two tasks:
+  (default)  Meta MapAnything (Apache-2.0 weights): many views → depth, camera poses, intrinsics in one shared frame.
+  "moge"     Microsoft MoGe-3 ViT-L (MIT): one image at a time → sharp metric depth, normals and a valid-pixel mask at
+             the image's own resolution. Pass the field of view MapAnything found (fov_x, degrees) so both agree.
+
+MoGe request  {"input": {"task": "moge", "images": [base64 ...], "fov_x": [deg, ...] or deg (optional),
+                         "resolution_level": 0-9 (default 9)}}
+MoGe response {"views": [{"npz": base64, "size": [W, H]}, ...]}: depth (float16, metres, 0 where invalid),
+              mask (bool), normal (int8 × 3, ×127, OpenCV camera axes), intrinsics (3x3, pixels).
+
+MapAnything:
 
 Request  {"input": {"images": [base64 PNG/JPEG, ...], "size": [width, height],
                     "views": [{"intrinsics": 3x3, "camera_pose": 4x4}, ...]}}   # "views" optional
@@ -26,6 +38,45 @@ from PIL import Image
 
 MODEL_ID = "facebook/map-anything-apache"
 model = MapAnything.from_pretrained(MODEL_ID).to("cuda").eval()
+_moge = None
+
+
+def _moge_model():
+    """MoGe-3 is loaded on first use, so MapAnything-only workers start as fast as before."""
+    global _moge
+    if _moge is None:
+        from huggingface_hub import hf_hub_download
+        from moge.model.v3 import MoGeModel
+        _moge = MoGeModel.from_pretrained(hf_hub_download("Ruicheng/moge-3-vitl", "model.pt")).to("cuda").eval()
+    return _moge
+
+
+def moge_job(inp):
+    images = [Image.open(io.BytesIO(base64.b64decode(d))).convert("RGB") for d in inp["images"]]
+    fov = inp.get("fov_x")
+    fovs = fov if isinstance(fov, list) else [fov] * len(images)
+    level = int(inp.get("resolution_level", 9))
+    m = _moge_model()
+    out = []
+    for img, fx in zip(images, fovs):
+        t = torch.tensor(np.asarray(img, dtype=np.float32) / 255, device="cuda").permute(2, 0, 1)
+        with torch.no_grad():
+            r = m.infer(t, fov_x=fx, resolution_level=level, use_fp16=True)
+        depth = r["depth"].float().cpu().numpy()
+        mask = r["mask"].cpu().numpy().astype(bool) if "mask" in r else np.isfinite(depth)
+        depth = np.where(mask & np.isfinite(depth), depth, 0).astype(np.float16)
+        H, W = depth.shape
+        K = r["intrinsics"].float().cpu().numpy().astype(np.float64)
+        K[0] *= W
+        K[1] *= H
+        packed = {"depth": depth, "mask": mask, "intrinsics": K}
+        if r.get("normal") is not None:
+            n = np.nan_to_num(r["normal"].float().cpu().numpy())
+            packed["normal"] = np.clip(np.round(n * 127), -127, 127).astype(np.int8)
+        buf = io.BytesIO()
+        np.savez_compressed(buf, **packed)
+        out.append({"npz": base64.b64encode(buf.getvalue()).decode(), "size": [W, H]})
+    return {"views": out}
 
 
 def _views_with_extras(images: list[Image.Image], extras: list[dict]) -> list[dict]:
@@ -43,6 +94,8 @@ def _views_with_extras(images: list[Image.Image], extras: list[dict]) -> list[di
 
 def handler(job):
     inp = job["input"]
+    if inp.get("task") == "moge":
+        return moge_job(inp)
     size = tuple(int(v) for v in inp["size"])
     if any(v % 14 for v in size):
         return {"error": f"size {size} must be multiples of 14"}

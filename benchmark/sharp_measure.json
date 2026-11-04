@@ -1,0 +1,133 @@
+{
+ "truck": [
+  {
+   "depth": "MapAnything 518 px",
+   "keyframes_fused": 16,
+   "of": 16,
+   "icp_rms_m": 0.048,
+   "size_m": {
+    "length": 6.118,
+    "width": 2.23,
+    "height": 3.117,
+    "top": 3.104,
+    "points": 61909
+   },
+   "road_under_truck_y": -0.013,
+   "road_under_beam_y": 0.071,
+   "beam_clearance_m": 3.409,
+   "beam_clearance_true_m": 3.556,
+   "roof_minus_clearance_m": -0.292,
+   "size_on_local_road_m": {
+    "length": 5.737,
+    "width": 2.452,
+    "height": 1.809,
+    "road_tilt_vs_scene_ground_deg": 36.1,
+    "points": 61909
+   }
+  },
+  {
+   "depth": "MoGe-3 1280 px",
+   "keyframes_fused": 16,
+   "of": 16,
+   "icp_rms_m": 0.035,
+   "size_m": {
+    "length": 9.497,
+    "width": 2.257,
+    "height": 3.247,
+    "top": 3.367,
+    "points": 164918
+   },
+   "road_under_truck_y": 0.121,
+   "road_under_beam_y": -0.169,
+   "beam_clearance_m": 3.627,
+   "beam_clearance_true_m": 3.556,
+   "roof_minus_clearance_m": -0.38,
+   "size_on_local_road_m": {
+    "length": 9.501,
+    "width": 2.26,
+    "height": 3.314,
+    "road_tilt_vs_scene_ground_deg": 0.5,
+    "points": 164918
+   }
+  }
+ ],
+ "rally": [
+  {
+   "size_scene_ground_m": {
+    "length": 4.294,
+    "width": 1.725,
+    "height": 1.456,
+    "top": 0.925,
+    "points": 26057
+   },
+   "depth": "MapAnything 518 px",
+   "keyframes_fused": 7,
+   "of": 10,
+   "icp_rms_m": 0.075,
+   "size_m": {
+    "length": 4.294,
+    "width": 1.711,
+    "height": 1.036,
+    "road_tilt_vs_scene_ground_deg": 0.9,
+    "points": 26057
+   },
+   "true_m": {
+    "length": 4.085,
+    "width": 1.875,
+    "height": 1.19
+   }
+  },
+  {
+   "size_scene_ground_m": {
+    "length": 4.262,
+    "width": 1.738,
+    "height": 1.646,
+    "top": 1.041,
+    "points": 45455
+   },
+   "depth": "MoGe-3 1280 px",
+   "keyframes_fused": 9,
+   "of": 10,
+   "icp_rms_m": 0.069,
+   "size_m": {
+    "length": 4.267,
+    "width": 1.73,
+    "height": 1.126,
+    "road_tilt_vs_scene_ground_deg": 0.9,
+    "points": 45455
+   },
+   "true_m": {
+    "length": 4.085,
+    "width": 1.875,
+    "height": 1.19
+   }
+  }
+ ],
+ "rally_global_scale": [
+  {
+   "size_scene_ground_m": {
+    "length": 4.477,
+    "width": 1.809,
+    "height": 1.707,
+    "top": 1.095,
+    "points": 46694
+   },
+   "depth": "MoGe-3 1280 px",
+   "keyframes_fused": 10,
+   "of": 10,
+   "icp_rms_m": 0.053,
+   "size_m": {
+    "length": 4.457,
+    "width": 1.78,
+    "height": 1.339,
+    "road_tilt_vs_scene_ground_deg": 2.6,
+    "points": 46694
+   },
+   "true_m": {
+    "length": 4.085,
+    "width": 1.875,
+    "height": 1.19
+   }
+  }
+ ]
+}

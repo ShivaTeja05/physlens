@@ -136,7 +136,14 @@ export default function PointWorld() {
   const h = data?.header
   const box = h?.boxes[k]
   const notes = (h?.notes ?? {}) as Record<string, any>
-  const speed = notes.speeds_kmh && k > 0 ? notes.speeds_kmh[k - 1] : undefined
+  // The fitted speed curve (one physical fit over every frame) when there is one; else frame-to-frame speeds.
+  const curve = notes.speed_curve as { t: number[]; kmh: number[]; err_kmh: number[] } | undefined
+  const tNow = objectGroups[k]?.t
+  let speed: string | undefined
+  if (curve && tNow !== undefined && tNow >= curve.t[0] && tNow <= curve.t[curve.t.length - 1]) {
+    const i = curve.t.reduce((best, x, j) => (Math.abs(x - tNow) < Math.abs(curve.t[best] - tNow) ? j : best), 0)
+    speed = `${Math.max(curve.kmh[i], 0).toFixed(1)} ± ${curve.err_kmh[i].toFixed(1)}`
+  } else if (notes.speeds_kmh && k > 0) speed = `${notes.speeds_kmh[k - 1]}`
 
   return (
     <div className="pw">
@@ -179,9 +186,13 @@ export default function PointWorld() {
           <div className="pw-facts">
             <div><b>{h.points.toLocaleString()}</b> points: {h.static_points.toLocaleString()} world, {h.object_points.toLocaleString()} {h.object} ({objectGroups.length} moments)</div>
             {box && <div>{h.object} now: <b>{box.size[0].toFixed(2)} m</b> long × <b>{box.size[2].toFixed(2)} m</b> wide × <b>{box.size[1].toFixed(2)} m</b> high, from {box.points.toLocaleString()} points{speed !== undefined && <> · <b>{speed} km/h</b></>}</div>}
-            <div>Size over all moments (median): {h.object_size_median_m.length} × {h.object_size_median_m.width} × {h.object_size_median_m.height} m</div>
+            {notes.fused_size_m
+              ? <div>Size, all moments merged ({notes.fused_from}): <b>{notes.fused_size_m.length.toFixed(2)} × {notes.fused_size_m.width.toFixed(2)} × {notes.fused_size_m.height.toFixed(2)} m</b>
+                  {notes.true_size_m && <> · published {notes.true_size_m.length} × {notes.true_size_m.width} × {notes.true_size_m.height} m</>}
+                  {notes.beam_clearance_m && <> · bridge clearance measured {notes.beam_clearance_m.toFixed(2)} m (signed 3.56 m)</>}</div>
+              : <div>Size over all moments (median): {h.object_size_median_m.length} × {h.object_size_median_m.width} × {h.object_size_median_m.height} m</div>}
             <div>Scale: {h.scale_from}{notes.check ? ` · check: ${notes.check}` : ''}</div>
-            {notes.approach_speed_kmh && <div>Approach speed {notes.approach_speed_kmh} ± {notes.approach_speed_err_kmh} km/h; impact between frames {notes.impact_between_frames?.join('–')}</div>}
+            {notes.speed_at_contact_kmh && <div>Cruising {notes.cruise_kmh} km/h, braking at {notes.braking_decel_ms2} m/s²; hits the beam at <b>{notes.speed_at_contact_kmh} ± {notes.speed_at_contact_err_kmh} km/h</b> (frames {notes.contact_frames?.join('–')}), then moves {notes.distance_after_contact_m} m more while the roof is peeled</div>}
             {notes.speed_kmh_median && <div>Speed {notes.speed_kmh_median} km/h (range {notes.speed_kmh_range?.join('–')})</div>}
             <div className="pw-note">{h.density_note}. Camera {h.camera.moving ? 'moving (its motion removed)' : 'fixed'}. Drag to orbit, scroll to zoom.</div>
           </div>
