@@ -157,7 +157,7 @@ def local_plane(static: np.ndarray, footprint: np.ndarray, r_in: float = 0.3, r_
     n, a = best
     inl = ring[np.abs((ring - a) @ n) < thresh]
     c0 = inl.mean(0)
-    n = np.linalg.svd(inl - c0)[2][-1]
+    n = np.linalg.svd(inl - c0, full_matrices=False)[2][-1]
     return (n if n[1] > 0 else -n), c0
 
 

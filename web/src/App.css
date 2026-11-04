@@ -335,3 +335,39 @@ header { padding-top: 12px; padding-bottom: 12px; }
 .pw-views button { background: rgba(5, 12, 20, 0.8); border: 1px solid var(--line); color: var(--muted); border-radius: 8px;
   padding: 5px 10px; font: 600 12px Inter, system-ui, sans-serif; cursor: pointer; }
 .pw-views button.on { color: var(--accent); border-color: var(--accent); }
+
+/* Point worlds: events, rigid body, explanation, standalone simulator page */
+.pw-timeline { position: relative; flex: 1; min-width: 200px; display: flex; align-items: center; }
+.pw-timeline > input[type=range] { width: 100%; accent-color: var(--accent); }
+.pw-tick { position: absolute; top: -16px; transform: translateX(-50%); background: rgba(5, 12, 20, 0.9); border: 1px solid var(--line);
+  color: var(--accent); border-radius: 6px; font-size: 11px; line-height: 1; padding: 2px 4px; cursor: pointer; }
+.pw-tick.contact, .pw-tick.impact { color: #ff6b6b; border-color: #ff6b6b; }
+.pw-tick.braking, .pw-tick.crush { color: #ffb347; border-color: #ffb347; }
+.pw-event-now { position: absolute; left: 10px; top: 10px; z-index: 2; background: rgba(5, 12, 20, 0.85); border: 1px solid var(--line);
+  color: var(--text); border-radius: 10px; padding: 6px 10px; font-size: 13px; max-width: 60%; }
+.pw-event-now.hot { border-color: #ff4d4d; color: #ffd0d0; box-shadow: 0 0 18px rgba(255, 77, 77, 0.35); }
+.pw-hot { color: #ffd0d0; text-shadow: 0 0 8px #ff4d4d; }
+.pw-events { display: grid; gap: 4px; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 10px 14px; }
+.pw-events-title { font-size: 11.5px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
+.pw-ev { display: grid; grid-template-columns: 64px 1fr; gap: 0 10px; text-align: left; background: transparent; border: 0; border-left: 2px solid var(--line);
+  color: var(--muted); padding: 3px 8px; cursor: pointer; font-size: 13.5px; }
+.pw-ev.past { color: var(--text); border-left-color: var(--accent); }
+.pw-ev.key.past { border-left-color: #ff4d4d; }
+.pw-ev-t { font-variant-numeric: tabular-nums; color: var(--muted); }
+.pw-ev-d, .pw-ev-truth { grid-column: 2; font-size: 12.5px; color: var(--muted); }
+.pw-ev-truth { color: #8fe3a0; }
+.pw-explain { display: grid; gap: 8px; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 10px 14px; font-size: 13.5px; }
+.pw-explain form { display: flex; gap: 8px; flex-wrap: wrap; }
+.pw-explain input { flex: 1; min-width: 200px; background: #070b12; border: 1px solid var(--line); color: var(--text); border-radius: 8px; padding: 6px 10px; }
+.pw-explain button { background: rgba(62, 230, 255, 0.14); color: var(--accent); border: 1px solid var(--accent); border-radius: 8px; padding: 5px 10px; cursor: pointer; }
+.pw-explain button:disabled { opacity: 0.5; cursor: default; }
+.pw-answer { color: var(--text); border-left: 2px solid var(--accent); padding-left: 10px; }
+.pw-warn { color: #ffb347 !important; }
+.pw-truth { border-collapse: collapse; margin: 4px 0; font-size: 13px; }
+.pw-truth th, .pw-truth td { text-align: left; padding: 3px 14px 3px 0; border-bottom: 1px solid var(--line); }
+.pw-truth th { color: var(--muted); font-weight: 500; }
+.pw-standalone { min-height: 100vh; padding: 14px 16px 24px; }
+.pw-standalone .pw-stage { height: min(68vh, 720px); }
+.pw-brand { color: var(--muted); font-size: 14px; }
+.pw-brand b { color: var(--accent); }
+@media (max-width: 640px) { .pw-event-now { max-width: 90%; font-size: 12px; } .pw-standalone .pw-stage { height: 56vh; } }

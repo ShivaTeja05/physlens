@@ -246,7 +246,7 @@ async def create_scan(file: Optional[UploadFile] = File(None), sample: Optional[
 @app.post("/api/ask")
 async def ask_question(context: str = Form(...), question: Optional[str] = Form(None),
                        audio: Optional[UploadFile] = File(None), reset: bool = Form(False)):
-    """A question about one scan ("scan:<id>") or lab run ("run:<id>"), typed or spoken. Answers come from what that
+    """A question about one scan ("scan:<id>"), lab run ("run:<id>") or 3D world ("world:<name>"), typed or spoken. Answers come from what that
     scan or run measured, and the conversation is remembered per context so follow-ups stay consistent."""
     from . import ask as asking
     kind, _, cid = context.partition(":")
@@ -271,8 +271,13 @@ async def ask_question(context: str = Form(...), question: Optional[str] = Form(
             facts |= asking.record_facts(recorder.export(cid))
         except KeyError:
             pass
+    elif kind == "world":
+        f = MEDIA / "pointworld" / f"{Path(cid).name}.json"
+        if not f.exists():
+            raise HTTPException(404, "unknown world")
+        facts = asking.world_facts(json.loads(f.read_text()))
     else:
-        raise HTTPException(400, "context must be scan:<id> or run:<id>")
+        raise HTTPException(400, "context must be scan:<id>, run:<id> or world:<name>")
     if reset:
         asking.reset(context)
     heard = None

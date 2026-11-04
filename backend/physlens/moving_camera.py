@@ -125,7 +125,7 @@ def _plane_ransac(P: np.ndarray, thresh: float, iters: int = 400, seed: int = 0)
     inl = np.abs((P - a) @ nrm) < thresh
     # Least-squares refit on the inliers.
     c = P[inl].mean(0)
-    nrm = np.linalg.svd(P[inl] - c)[2][-1]
+    nrm = np.linalg.svd(P[inl] - c, full_matrices=False)[2][-1]
     return nrm, c, np.abs((P - c) @ nrm) < thresh
 
 

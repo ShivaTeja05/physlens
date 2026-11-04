@@ -89,6 +89,22 @@ def run_facts(events: list[dict], title: str) -> dict:
     return facts
 
 
+def world_facts(header: dict) -> dict:
+    """A measured 3D world (media/pointworld/<name>.json): the object, its sizes and speeds, the events found from
+    its points, and the checks against known values, for questions about what happened."""
+    n = header.get("notes", {})
+    keep = ("events", "rigid_body", "fused_size_m", "true_size_m", "beam_clearance_m", "height_check", "cruise_kmh",
+            "braking_decel_ms2", "speed_at_contact_kmh", "speed_at_contact_err_kmh", "distance_after_contact_m",
+            "speed_kmh_median", "speed_kmh_range", "truth", "truth_table", "check", "reference", "contact_detected")
+    facts = {"kind": "3D world measured from a video", "title": header.get("title"), "object": header.get("object"),
+             "points": header.get("points"), "depth_source": header.get("depth_source"), "scale_from": header.get("scale_from"),
+             "camera_moving": header.get("camera", {}).get("moving")}
+    facts |= {k: n[k] for k in keep if k in n}
+    for e in facts.get("events", []):
+        e.pop("window", None)
+    return facts
+
+
 def record_facts(rec: dict) -> dict:
     """The recorder's key moments (contacts with speeds in and out, peaks) for the assistant."""
     return {"key_moments": [{k: (round(v, 3) if isinstance(v, float) else v) for k, v in e.items()
