@@ -46,7 +46,7 @@ export default function WhatIfPanel({ runId, object, onPaths }: { runId: string;
   })
   return (
     <section className="card whatif">
-      <div className="label">Replay & what-if <span className="knowledge rec">from the record</span></div>
+      <div className="label">Replay and what if <span className="knowledge rec">from the record</span></div>
       {err && <div className="sub err">{err.replace('Error: ', '')}</div>}
       {m && (
         <>
@@ -65,7 +65,7 @@ export default function WhatIfPanel({ runId, object, onPaths }: { runId: string;
             <input type="range" min={0.3} max={1.8} step={0.05} value={speed} onChange={(x) => setSpeed(Number(x.target.value))} />
           </label>
           <div className="wi-row">
-            <button className="chip active" disabled={busy} onClick={() => run(changes())}>Simulate what-if</button>
+            <button className="chip active" disabled={busy} onClick={() => run(changes())}>Simulate what if</button>
             <button className="chip" disabled={busy} onClick={() => { setG(m.gravity ?? undefined); setE(m.restitution ?? undefined); setSpeed(1); run({}) }}>Reset</button>
           </div>
           <div className="wi-summary">{res?.summary.map((l, i) => <p key={i}>{l}</p>)}</div>

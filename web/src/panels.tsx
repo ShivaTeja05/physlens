@@ -1,3 +1,4 @@
+import { Check, LockSimple, X } from '@phosphor-icons/react'
 import type { StageState } from './derive'
 import type { PredictionEvent, VerdictEvent } from './types'
 
@@ -152,14 +153,14 @@ function PredictionCard({ p, v }: { p: PredictionEvent; v?: VerdictEvent }) {
   return (
     <div className={`pred ${v ? (v.hit ? 'hit' : 'miss') : 'locked'}`}>
       <div className="pred-top">
-        <span className="lock">🔒 LOCKED · {lockedTime(p.locked_at)}</span>
+        <span className="lock"><LockSimple weight="fill" aria-hidden /> LOCKED · {lockedTime(p.locked_at)}</span>
         <span className="hash" title={p.hash}>#{p.hash.slice(0, 10)}</span>
       </div>
       <div className="pred-text">{p.text}</div>
       <div className="pred-ci">90% band: {fmt(p.ci90[0])} – {fmt(p.ci90[1])} {p.unit}</div>
       {v && (
         <div className="stamp">
-          {v.hit ? '✓ HIT' : '✗ MISS'} <span>actual {fmt(v.actual)} {p.unit}</span>
+          {v.hit ? <><Check weight="bold" aria-hidden /> HIT</> : <><X weight="bold" aria-hidden /> MISS</>} <span>actual {fmt(v.actual)} {p.unit}</span>
         </div>
       )}
     </div>
@@ -194,7 +195,7 @@ export function Explanation({ s }: { s: StageState }) {
       <div className="label">Why</div>
       <p>{e.text}</p>
       <div className={`badge ${e.verified ? 'ok' : ''}`}>
-        {e.verified ? '✓ every number traced to a measurement' : 'unverified'} · {e.source === 'muse_spark' ? 'Muse Spark' : 'template'}
+        {e.verified ? <><Check weight="bold" aria-hidden /> every number traced to a measurement</> : 'unverified'} · {e.source === 'muse_spark' ? 'Muse Spark' : 'template'}
       </div>
     </section>
   )

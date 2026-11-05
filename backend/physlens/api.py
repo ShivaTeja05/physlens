@@ -6,6 +6,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import os
 import re
 import subprocess
 import threading
@@ -16,6 +17,8 @@ from typing import Optional
 
 from fastapi import FastAPI, File, Form, HTTPException, UploadFile, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
+from starlette.middleware.trustedhost import TrustedHostMiddleware
 from fastapi.staticfiles import StaticFiles
 
 from .config import load_env
@@ -25,7 +28,7 @@ from .experiments import CARDS
 from .ledger import Ledger
 from .perception import default_tracker
 from .pipeline import run_pipeline
-from .synth import ffmpeg_exe
+from .synth import FFMPEG_INPUT, ffmpeg_exe
 
 ROOT = Path(__file__).resolve().parents[2]
 load_env()
@@ -50,10 +53,52 @@ class Run:
 
 
 app = FastAPI(title="PhysLens orchestrator")
-app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
+
+# Only pages served from this machine may drive the engine. Without this, any website open in the same browser could
+# POST scans (spending the Meta budget) or read records and media: CORS alone doesn't stop a simple POST from
+# running, and doesn't apply to WebSockets at all. The host check stops DNS rebinding (evil.example → 127.0.0.1).
+# PHYSLENS_ALLOWED_ORIGINS adds more origins (comma separated), for a deployed web app.
+LOCAL_ORIGIN = re.compile(r"^https?://(localhost|127\.0\.0\.1|\[::1\])(:\d+)?$")
+EXTRA_ORIGINS = {o.strip() for o in os.environ.get("PHYSLENS_ALLOWED_ORIGINS", "").split(",") if o.strip()}
+
+
+def origin_allowed(origin: Optional[str]) -> bool:
+    """No Origin header (curl, the tests, a top-level page load) is allowed; a browser page must be local."""
+    return origin is None or bool(LOCAL_ORIGIN.match(origin)) or origin in EXTRA_ORIGINS
+
+
+@app.middleware("http")
+async def refuse_foreign_origins(request, call_next):
+    if not origin_allowed(request.headers.get("origin")):
+        return JSONResponse({"detail": "requests from other websites are not allowed"}, status_code=403)
+    return await call_next(request)
+
+
+app.add_middleware(CORSMiddleware, allow_origin_regex=LOCAL_ORIGIN.pattern, allow_origins=sorted(EXTRA_ORIGINS),
+                   allow_methods=["*"], allow_headers=["*"])
+app.add_middleware(TrustedHostMiddleware, allowed_hosts=["localhost", "127.0.0.1", "[::1]", "testserver",
+                                                         *(h.strip() for h in os.environ.get("PHYSLENS_ALLOWED_HOSTS", "").split(",") if h.strip())])
 app.mount("/samples", StaticFiles(directory=SAMPLES), name="samples")
 app.mount("/media", StaticFiles(directory=MEDIA), name="media")
 RUNS: dict[str, Run] = {}
+MAX_VIDEO_BYTES = 300 * 1024 * 1024   # a few minutes of phone video; anything bigger is not a lab clip
+MAX_IMAGE_BYTES = 25 * 1024 * 1024
+MAX_AUDIO_BYTES = 10 * 1024 * 1024
+# Runs and scans call paid models from worker threads; the budget check before each call can't see calls still in
+# flight, so this bounds how far parallel jobs could pass the cap (and how much one browser can queue up).
+JOBS = threading.BoundedSemaphore(2)
+BUSY = "Two analyses are already running. Wait for one to finish, then try again."
+
+
+async def _read_upload(file: UploadFile, limit: int, what: str) -> bytes:
+    """The upload's bytes, refusing (413) past `limit` without reading the rest into memory."""
+    chunks, size = [], 0
+    while chunk := await file.read(1 << 20):
+        size += len(chunk)
+        if size > limit:
+            raise HTTPException(413, f"That {what} is over {limit // (1024 * 1024)} MB. Trim it or send a smaller one.")
+        chunks.append(chunk)
+    return b"".join(chunks)
 
 
 def _broadcast(run: Run, event: dict) -> None:
@@ -67,7 +112,7 @@ def _transcode(src: Path, dst: Path) -> None:
     """Uploads can be any phone format; the browser needs H.264 in MP4. Baseline profile with no B-frames and a
     90 kHz time base: with ffmpeg's defaults (High profile, B-frames, 12800 time base) SAM 3.1 processed and billed a
     70-frame clip as 1,680 frames, 24× too many."""
-    subprocess.run([ffmpeg_exe(), "-y", "-loglevel", "error", "-i", str(src), "-an", "-c:v", "libx264",
+    subprocess.run([ffmpeg_exe(), "-y", "-loglevel", "error", *FFMPEG_INPUT, "-i", str(src), "-an", "-c:v", "libx264",
                     "-profile:v", "baseline", "-bf", "0", "-pix_fmt", "yuv420p", "-crf", "18",
                     "-video_track_timescale", "90000", "-movflags", "+faststart", str(dst)], check=True)
 
@@ -79,6 +124,7 @@ def _sample_settings() -> dict:
 
 def _process(run: Run, video: Path, url: str, px_per_m: Optional[float], diameter_m: Optional[float],
              params: dict) -> None:
+    """Runs on a worker thread holding one JOBS slot, which it releases at the end."""
     try:
         card = CARDS.get(run.experiment)
         if run.experiment == "auto":
@@ -90,8 +136,9 @@ def _process(run: Run, video: Path, url: str, px_per_m: Optional[float], diamete
     except Exception as exc:
         run.status, run.error = "error", str(exc)
     finally:
+        JOBS.release()
         _save_record(run)
-        _broadcast(run, {"type": "_end", "status": run.status})
+        _broadcast(run, {"type": "_end", "status": run.status, "error": run.error})
 
 
 def _save_record(run: Run) -> None:
@@ -208,11 +255,11 @@ async def create_scan(file: Optional[UploadFile] = File(None), sample: Optional[
             raise HTTPException(404, f"unknown scan sample {sample}")
         img = cv2.imread(str(path))
     elif file is not None:
-        img = cv2.imdecode(np.frombuffer(await file.read(), np.uint8), cv2.IMREAD_COLOR)
+        img = cv2.imdecode(np.frombuffer(await _read_upload(file, MAX_IMAGE_BYTES, "image"), np.uint8), cv2.IMREAD_COLOR)
     else:
         raise HTTPException(400, "send an image file or a sample name")
     if img is None:
-        raise HTTPException(400, "couldn't read that image")
+        raise HTTPException(400, "Couldn't read that file as an image. Send a JPG or PNG photo.")
     if img.shape[1] > 1280:   # plenty for SAM and Muse Spark, and keeps uploads quick
         img = cv2.resize(img, (1280, round(img.shape[0] * 1280 / img.shape[1])), interpolation=cv2.INTER_AREA)
     ref = None
@@ -221,6 +268,8 @@ async def create_scan(file: Optional[UploadFile] = File(None), sample: Optional[
             ref = json.loads(reference)
         except ValueError:
             raise HTTPException(400, "reference must be JSON")
+    if not JOBS.acquire(blocking=False):
+        raise HTTPException(429, BUSY)
     job_id = uuid.uuid4().hex[:10]
     if sample:
         url = f"/samples/scan/{Path(sample).name}.jpg"
@@ -238,6 +287,8 @@ async def create_scan(file: Optional[UploadFile] = File(None), sample: Optional[
             progress("done", result)
         except Exception as exc:
             SCANS[job_id] = {**SCANS[job_id], "stage": "error", "error": str(exc)[:300]}
+        finally:
+            JOBS.release()
 
     threading.Thread(target=work, daemon=True).start()
     return {"job_id": job_id}
@@ -283,7 +334,10 @@ async def ask_question(context: str = Form(...), question: Optional[str] = Form(
     heard = None
     if audio is not None:
         try:
-            heard = await asyncio.to_thread(asking.transcribe, await audio.read(), audio.filename or "question.webm")
+            clip = await _read_upload(audio, MAX_AUDIO_BYTES, "recording")
+            heard = await asyncio.to_thread(asking.transcribe, clip, audio.filename or "question.webm")
+        except HTTPException:
+            raise
         except Exception as exc:
             raise HTTPException(502, f"couldn't transcribe: {str(exc)[:200]}")
         question = heard
@@ -296,11 +350,38 @@ async def ask_question(context: str = Form(...), question: Optional[str] = Form(
     return {"question": question.strip(), "heard": heard, **out}
 
 
+@app.get("/api/worlds/{name}/specs")
+def world_specs_cached(name: str):
+    """The specs agent's last lookup for this world, if one was made (free: no model calls)."""
+    f = MEDIA / "pointworld" / f"{Path(name).name}.specs.json"
+    if not f.exists():
+        raise HTTPException(404, "no lookup yet")
+    return json.loads(f.read_text())
+
+
+@app.post("/api/worlds/{name}/specs")
+async def world_specs(name: str, refresh: bool = Form(False)):
+    """Published specs of the world's object, looked up by the Muse Spark specs agent (NHTSA, VIN decoder, Wikipedia),
+    each number checked against the tool results, cross-checked between sources and against the video's measurement.
+    Costs a few Muse Spark calls; cached per world."""
+    from . import specs
+    pw = MEDIA / "pointworld"
+    if not (pw / f"{Path(name).name}.json").exists():
+        raise HTTPException(404, "unknown world")
+    try:
+        return await asyncio.to_thread(specs.for_world, pw, Path(name).name, refresh)
+    except RuntimeError as exc:
+        raise HTTPException(503, str(exc))
+
+
 @app.websocket("/api/voice")
 async def voice(ws: WebSocket):
     """Push-to-talk: the app streams 16 kHz mono PCM16 while the button is held, then sends {"type":"stop"}.
     Words come back as they are recognised ({"type":"partial"}), then {"type":"final"}."""
     from .voice import VoiceSession
+    if not origin_allowed(ws.headers.get("origin")):
+        await ws.close(code=4403)
+        return
     await ws.accept()
 
     async def partial(text: str) -> None:
@@ -432,8 +513,19 @@ async def create_run(experiment_id: str = Form("drop"), sample: Optional[str] = 
     """Scale: `px_per_m` from a ruler in the shot, or `diameter_cm` of the ball. Samples carry their own.
     `params`: JSON of experiment settings (e.g. a taped table height), merged over the card's defaults."""
     run_params: dict = {}
+    for name, value in (("px_per_m", px_per_m), ("diameter_cm", diameter_cm)):
+        if value is not None and not value > 0:
+            raise HTTPException(400, f"{name} must be a positive number")
     if experiment_id not in CARDS and experiment_id != "auto":
         raise HTTPException(404, f"unknown experiment {experiment_id}")
+    extra: dict = {}
+    if params:
+        try:
+            extra = {k: float(v) for k, v in json.loads(params).items() if v not in (None, "")}
+        except (ValueError, TypeError, AttributeError):
+            raise HTTPException(400, "params must be a JSON object of numbers")
+        if any(not v > 0 for v in extra.values()):   # lengths and masses: zero or negative would give nonsense
+            raise HTTPException(400, "every measurement must be a positive number")
     if sample:
         video = SAMPLES / f"{Path(sample).name}.mp4"
         if not video.exists():
@@ -446,25 +538,26 @@ async def create_run(experiment_id: str = Form("drop"), sample: Optional[str] = 
     elif file is not None:
         base = re.sub(r"[^a-zA-Z0-9_-]", "-", Path(file.filename or "upload").stem)[:40] or "upload"
         raw = MEDIA / f"_raw_{uuid.uuid4().hex}{Path(file.filename or '').suffix}"
-        raw.write_bytes(await file.read())
         video = MEDIA / f"{base}-{uuid.uuid4().hex[:6]}.mp4"
         try:
+            raw.write_bytes(await _read_upload(file, MAX_VIDEO_BYTES, "video"))
             await asyncio.to_thread(_transcode, raw, video)
+        except subprocess.CalledProcessError:
+            video.unlink(missing_ok=True)
+            raise HTTPException(400, "Couldn't read that file as a video. Send an MP4, MOV or WebM clip.")
         finally:
             raw.unlink(missing_ok=True)
         url = f"/media/{video.name}"
     else:
         raise HTTPException(400, "send a sample name or a video file")
 
+    run_params.update(extra)   # the user's measurements win over a sample's stored settings
+    if not JOBS.acquire(blocking=False):
+        raise HTTPException(429, BUSY)
     run_id = f"{base}-{uuid.uuid4().hex[:6]}"
     run = Run(run_id, experiment_id, url, EventLog(run_id, REPLAYS / f"{run_id}.jsonl"))
     run.log.subscribe(lambda e: _broadcast(run, e))
     RUNS[run_id] = run
-    if params:
-        try:
-            run_params.update({k: float(v) for k, v in json.loads(params).items() if v not in (None, "")})
-        except (ValueError, TypeError, AttributeError):
-            raise HTTPException(400, "params must be a JSON object of numbers")
     diameter_m = diameter_cm / 100 if diameter_cm else None
     threading.Thread(target=_process, args=(run, video, url, px_per_m, diameter_m, run_params), daemon=True).start()
     return {"run_id": run_id}
@@ -490,6 +583,9 @@ def run_events(run_id: str):
 @app.websocket("/api/runs/{run_id}/stream")
 async def stream(ws: WebSocket, run_id: str):
     """Sends every event so far, then new ones as they happen, then {"type": "_end"}."""
+    if not origin_allowed(ws.headers.get("origin")):
+        await ws.close(code=4403)
+        return
     await ws.accept()
     if run_id not in RUNS:
         await ws.close(code=4404)
@@ -504,7 +600,7 @@ async def stream(ws: WebSocket, run_id: str):
         for event in backlog:
             await ws.send_json(event)
         if finished:
-            await ws.send_json({"type": "_end", "status": run.status})
+            await ws.send_json({"type": "_end", "status": run.status, "error": run.error})
         else:
             # An event emitted while we were subscribing can be in the backlog and the queue; the log
             # broadcasts the same dict object it stores, so identity tells them apart.

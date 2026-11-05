@@ -10,19 +10,36 @@ export type Experiment = {
 }
 export type Health = { tracker: string; agent: string }
 
-export async function getSamples(): Promise<Sample[]> {
-  const r = await fetch('/api/samples')
+/** The engine's own words for a failed request. FastAPI sends {"detail": "..."} (or a list of field errors);
+ *  a crash or the dev proxy sends plain text, and an engine that isn't running gives 502 or 504 through Vite. */
+export async function failure(r: Response): Promise<Error> {
+  if (r.status === 502 || (r.status === 503 && !r.headers.get('content-type')?.includes('json')) || r.status === 504)
+    return new Error('The engine is not reachable. Start the backend on port 8000, then try again.')
+  const text = await r.text().catch(() => '')
+  try {
+    const d = JSON.parse(text).detail
+    if (typeof d === 'string') return new Error(d)
+    if (Array.isArray(d)) return new Error(d.map((x) => `${(x.loc ?? []).slice(-1)[0] ?? 'input'}: ${x.msg}`).join('; '))
+  } catch { /* not JSON */ }
+  return new Error(r.status >= 500 ? `The engine hit an error (${r.status}). Its terminal shows the details.` : text || r.statusText)
+}
+
+async function getJson<T>(url: string): Promise<T> {
+  const r = await fetch(url)
+  if (!r.ok) throw await failure(r)
   return r.json()
 }
 
-export async function getExperiments(): Promise<Experiment[]> {
-  const r = await fetch('/api/experiments')
-  return r.json()
+export function getSamples(): Promise<Sample[]> {
+  return getJson('/api/samples')
 }
 
-export async function getHealth(): Promise<Health> {
-  const r = await fetch('/api/health')
-  return r.json()
+export function getExperiments(): Promise<Experiment[]> {
+  return getJson('/api/experiments')
+}
+
+export function getHealth(): Promise<Health> {
+  return getJson('/api/health')
 }
 
 export type RunInput = {
@@ -38,30 +55,33 @@ export async function createRun(input: RunInput): Promise<string> {
   if (input.diameterCm) form.set('diameter_cm', String(input.diameterCm))
   if (input.params && Object.keys(input.params).length) form.set('params', JSON.stringify(input.params))
   const r = await fetch('/api/runs', { method: 'POST', body: form })
-  if (!r.ok) throw new Error((await r.json()).detail ?? r.statusText)
+  if (!r.ok) throw await failure(r)
   return (await r.json()).run_id
 }
 
-/** Streams a run's events; resolves when the engine says it is finished. */
-export function streamRun(runId: string, onEvent: (e: PhysEvent) => void): Promise<'done' | 'error'> {
+export type RunEnd = { status: 'done' | 'error'; error?: string | null }
+
+/** Streams a run's events; resolves when the engine says it is finished, and fails if the connection drops first
+ *  (the engine stopped or restarted mid-run), so the page never waits forever. */
+export function streamRun(runId: string, onEvent: (e: PhysEvent) => void): Promise<RunEnd> {
   return new Promise((resolve, reject) => {
     const proto = location.protocol === 'https:' ? 'wss' : 'ws'
     const ws = new WebSocket(`${proto}://${location.host}/api/runs/${runId}/stream`)
+    let ended = false
     ws.onmessage = (msg) => {
       const data = JSON.parse(msg.data)
-      if (data.type === '_end') resolve(data.status)
+      if (data.type === '_end') { ended = true; resolve({ status: data.status, error: data.error }) }
       else onEvent(data as PhysEvent)
     }
-    ws.onerror = () => reject(new Error('lost connection to the engine'))
+    ws.onclose = () => { if (!ended) reject(new Error('Lost the connection to the engine before the analysis finished. Check that the backend is still running, then try again.')) }
   })
 }
 
 // --- Scan mode -----------------------------------------------------------------------------------------------
 
 
-export async function getScanSamples(): Promise<ScanSample[]> {
-  const r = await fetch('/api/scan-samples')
-  return r.json()
+export function getScanSamples(): Promise<ScanSample[]> {
+  return getJson('/api/scan-samples')
 }
 
 /** Starts a scan of a sample or an image (a webcam frame or an upload); returns the job id to poll. */
@@ -71,14 +91,12 @@ export async function startScan(input: { sample?: string; image?: Blob; referenc
   if (input.image) form.set('file', input.image, 'frame.jpg')
   if (input.reference) form.set('reference', JSON.stringify(input.reference))
   const r = await fetch('/api/scan', { method: 'POST', body: form })
-  if (!r.ok) throw new Error((await r.json()).detail ?? r.statusText)
+  if (!r.ok) throw await failure(r)
   return (await r.json()).job_id
 }
 
-export async function scanStatus(jobId: string): Promise<ScanStatus> {
-  const r = await fetch(`/api/scan/${jobId}`)
-  if (!r.ok) throw new Error(r.statusText)
-  return r.json()
+export function scanStatus(jobId: string): Promise<ScanStatus> {
+  return getJson(`/api/scan/${jobId}`)
 }
 
 // --- Recorder: past runs, replay and what-if -------------------------------------------------------------------
@@ -93,23 +111,19 @@ export type WhatIf = {
   replay: SimPath; what_if: SimPath | null; rms_m: number | null; summary: string[]; px_from_m: [number, number, number, number] | null
 }
 
-export async function getRecords(): Promise<RecordRow[]> {
-  const r = await fetch('/api/records')
-  return r.json()
+export function getRecords(): Promise<RecordRow[]> {
+  return getJson('/api/records')
 }
 
-export async function getRecordEvents(id: string): Promise<PhysEvent[]> {
-  const r = await fetch(`/api/records/${id}/events`)
-  if (!r.ok) throw new Error(r.statusText)
-  return r.json()
+export function getRecordEvents(id: string): Promise<PhysEvent[]> {
+  return getJson(`/api/records/${encodeURIComponent(id)}/events`)
 }
 
 export async function whatIf(id: string, object: string, changes: { gravity?: number; restitution?: number; speed_factor?: number; drag?: number }): Promise<WhatIf> {
   const form = new FormData()
   form.set('object', object)
   for (const [k, v] of Object.entries(changes)) if (v !== undefined) form.set(k, String(v))
-  const r = await fetch(`/api/records/${id}/whatif`, { method: 'POST', body: form })
-  const body = await r.json()
-  if (!r.ok) throw new Error(body.detail ?? r.statusText)
-  return body
+  const r = await fetch(`/api/records/${encodeURIComponent(id)}/whatif`, { method: 'POST', body: form })
+  if (!r.ok) throw await failure(r)
+  return r.json()
 }

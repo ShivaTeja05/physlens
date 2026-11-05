@@ -1,4 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { Microphone, Record } from '@phosphor-icons/react'
+import { failure } from './api'
+import { speakLine, stopVoice } from './voice'
 
 type Turn = { q: string; a?: string; verified?: boolean; error?: string }
 type Props = {
@@ -26,13 +29,8 @@ function toPcm16(f: Float32Array, fromRate: number): ArrayBuffer {
 }
 
 function say(text: string) {
-  if (!('speechSynthesis' in window)) return
-  speechSynthesis.cancel()
-  const u = new SpeechSynthesisUtterance(text)
-  const v = speechSynthesis.getVoices().find((x) => /Samantha|Daniel|Google UK English Female|Karen/.test(x.name))
-  if (v) u.voice = v
-  u.rate = 1.04
-  speechSynthesis.speak(u)
+  stopVoice()
+  speakLine(text, { rate: 1.04 })
 }
 
 export default function AskBar({ context, voice, onHighlight }: Props) {
@@ -60,13 +58,13 @@ export default function AskBar({ context, voice, onHighlight }: Props) {
     fresh.current = false
     try {
       const r = await fetch('/api/ask', { method: 'POST', body: form })
+      if (!r.ok) throw await failure(r)
       const body = await r.json()
-      if (!r.ok) throw new Error(body.detail ?? r.statusText)
       setTurns((t) => t.map((x, i) => (i === t.length - 1 ? { ...x, a: body.answer, verified: body.verified } : x)))
       if (voice) say(body.answer)
       onHighlight?.(body.parts ?? [])
     } catch (e) {
-      setTurns((t) => t.map((x, i) => (i === t.length - 1 ? { ...x, error: String(e) } : x)))
+      setTurns((t) => t.map((x, i) => (i === t.length - 1 ? { ...x, error: e instanceof Error ? e.message : String(e) } : x)))
     } finally {
       setBusy(false)
     }
@@ -75,7 +73,7 @@ export default function AskBar({ context, voice, onHighlight }: Props) {
   // Push-to-talk: stream the mic to the engine (→ Muse Voice) while held.
   const startListening = useCallback(async () => {
     if (!context || mic.current || busy) return
-    speechSynthesis.cancel()
+    stopVoice()
     setHeard('')
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: { channelCount: 1, echoCancellation: true, noiseSuppression: true } })
@@ -139,7 +137,7 @@ export default function AskBar({ context, voice, onHighlight }: Props) {
               <div className="ask-q">{t.q}</div>
               {t.a && <div className="ask-a">{t.a}{t.verified === false && <span className="ask-flag"> · contains numbers not measured</span>}</div>}
               {t.error && <div className="ask-a err">{t.error}</div>}
-              {!t.a && !t.error && <div className="ask-a thinking">thinking…</div>}
+              {!t.a && !t.error && <div className="ask-a thinking" aria-label="Thinking"><span /><span /></div>}
             </div>
           ))}
         </div>
@@ -148,7 +146,7 @@ export default function AskBar({ context, voice, onHighlight }: Props) {
         <button className={`mic ${listening ? 'on' : ''}`} disabled={disabled || busy}
           onPointerDown={(e) => { e.preventDefault(); startListening() }} onPointerUp={stopListening} onPointerLeave={() => listening && stopListening()}
           title="Hold to talk (or hold the space bar)">
-          {listening ? '● Listening' : '🎙 Hold to ask'}
+          {listening ? <><Record weight="fill" aria-hidden /><span className="mic-text">Listening</span></> : <><Microphone weight="bold" aria-hidden /><span className="mic-text">Hold to ask</span></>}
         </button>
         <input className="ask-input" value={listening ? heard : text} disabled={disabled || listening}
           placeholder={disabled ? 'Run an experiment or a scan, then ask about it' : listening ? 'Listening…' : 'Ask about what you see…'}

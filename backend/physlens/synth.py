@@ -32,6 +32,12 @@ class DropScene:
     x0_px: float = 420.0
 
 
+# Input options for ffmpeg on anything a user uploaded: real media containers from local files only, so a crafted
+# playlist or concat file can't make ffmpeg open other files on this machine.
+FFMPEG_INPUT = ["-protocol_whitelist", "file", "-format_whitelist",
+                "mov,mp4,m4a,3gp,3g2,mj2,matroska,webm,avi,mpegts,flv,ogg,wav,mp3,aac,flac"]
+
+
 def ffmpeg_exe() -> str:
     """The ffmpeg bundled with imageio-ffmpeg, so encoding doesn't depend on the system install."""
     import imageio_ffmpeg

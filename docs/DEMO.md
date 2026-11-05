@@ -16,7 +16,7 @@ Three demos, from no setup to the full pipeline. Start the engine and the web ap
 The spend cap stops Meta calls at `PHYSLENS_BUDGET_USD` (default $50); check it at `GET /api/budget`.
 
 ## A. The 5-minute judges' demo
-1. **The hook (30 s).** Open http://localhost:5173. Pick sample **Slow-mo 2×**, press play. PhysLens measures
+1. **The hook (30 s).** Open http://localhost:5173/app.html (the Lab; the landing page is at http://localhost:5173). Pick sample **Slow-mo 2×**, press play. PhysLens measures
    g ≈ 2.47 m/s² and says the video runs at half speed. *Point:* a language model "remembers" 9.81; PhysLens measures
    what's in the video. (**Memory vs eyes** panel.)
 2. **Predictions locked before they happen (1 min).** Pick **Real classroom drop**. Watch the trail, the law it finds

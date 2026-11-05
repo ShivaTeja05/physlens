@@ -168,11 +168,11 @@ def transcribe(audio: bytes, filename: str) -> str:
     import tempfile
     from pathlib import Path
 
-    from .synth import ffmpeg_exe
+    from .synth import FFMPEG_INPUT, ffmpeg_exe
     from .voice import transcribe_pcm
-    src = Path(tempfile.mkdtemp()) / (Path(filename).name or "audio")
-    src.write_bytes(audio)
-    pcm = subprocess.run([ffmpeg_exe(), "-loglevel", "error", "-i", str(src), "-f", "s16le", "-ac", "1", "-ar", "16000", "-"],
-                         capture_output=True, check=True).stdout
-    src.unlink(missing_ok=True)
+    with tempfile.TemporaryDirectory() as tmp:
+        src = Path(tmp) / (Path(filename).name or "audio")
+        src.write_bytes(audio)
+        pcm = subprocess.run([ffmpeg_exe(), "-loglevel", "error", *FFMPEG_INPUT, "-i", str(src),
+                              "-f", "s16le", "-ac", "1", "-ar", "16000", "-"], capture_output=True, check=True).stdout
     return asyncio.run(transcribe_pcm(pcm))

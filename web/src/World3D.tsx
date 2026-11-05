@@ -1,7 +1,9 @@
 import { Canvas } from '@react-three/fiber'
+import Safe3D from './Safe3D'
 import { Grid, Html, OrbitControls } from '@react-three/drei'
 import RAPIER from '@dimforge/rapier3d-compat'
 import { useEffect, useMemo, useState } from 'react'
+import { failure } from './api'
 
 // Mirrors backend/physlens/scene.py (format physlens-scene/1).
 type Src<T> = { value: T; source: string }
@@ -117,7 +119,7 @@ export default function World3D({ runId, time }: { runId: string; time: number }
   useEffect(() => {
     setScene(undefined); setTrack(undefined); setErr(undefined); setMj(undefined)
     fetch(`/api/records/${runId}/scene`).then(async (r) => {
-      if (!r.ok) throw new Error((await r.json()).detail ?? r.statusText)
+      if (!r.ok) throw await failure(r)
       const sc: Scene = await r.json()
       setScene(sc)
       setG(Math.abs(sc.world.gravity[1]))
@@ -147,10 +149,9 @@ export default function World3D({ runId, time }: { runId: string; time: number }
     setMjBusy(true)
     try {
       const r = await fetch(`/api/records/${runId}/mujoco`, { method: 'POST' })
-      const body = await r.json()
-      if (!r.ok) throw new Error(body.detail ?? r.statusText)
-      setMj(body)
-    } catch (x) { setErr(String(x)) } finally { setMjBusy(false) }
+      if (!r.ok) throw await failure(r)
+      setMj(await r.json())
+    } catch (x) { setErr(x instanceof Error ? x.message : String(x)) } finally { setMjBusy(false) }
   }
   // The fitted MuJoCo track is sampled every few ms; nearest sample is plenty for drawing.
   const mjAt = (t: number): [number, number, number] | null => {
@@ -187,6 +188,7 @@ export default function World3D({ runId, time }: { runId: string; time: number }
         </div>
       </div>
       <div className="w3-canvas">
+        <Safe3D>
         <Canvas camera={{ position: cam, fov: 45 }} shadows>
           <color attach="background" args={['#05070b']} />
           <ambientLight intensity={0.5} />
@@ -210,6 +212,7 @@ export default function World3D({ runId, time }: { runId: string; time: number }
           {pos && <Html position={[pos[0], pos[1] + (crash ? 1.6 : 0.25), pos[2]]} center><div className="w3-tag">measured</div></Html>}
           <OrbitControls target={target} />
         </Canvas>
+        </Safe3D>
       </div>
       <div className="recon-note">
         Solid = the measured atoms. Magenta = Rapier re-simulating from the first atom with g {g.toFixed(2)} m/s², bounciness {obj.shape === 'sphere' && Math.abs(e - obj.restitution.value) < 0.005 ? 'as measured at each bounce' : e.toFixed(2)}
