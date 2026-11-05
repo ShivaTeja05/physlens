@@ -1,8 +1,0 @@
-* { box-sizing: border-box; }
-html, body, #root { margin: 0; height: 100%; }
-body {
-  background: #05070b;
-  color: #e9eef5;
-  font-family: Inter, system-ui, -apple-system, sans-serif;
-  -webkit-font-smoothing: antialiased;
-}

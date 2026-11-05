@@ -32,7 +32,7 @@ cp .env.example .env            # optional: add your Meta API key; without it ev
 # 2. Web app (second terminal)
 cd web
 pnpm install
-pnpm dev                        # http://localhost:5173  (3D simulator: http://localhost:5173/sim.html)
+pnpm dev                        # http://localhost:5173 (landing), /app.html (Lab, Scan, 3D points), /sim.html (simulator)
 ```
 Then follow the demo script: **[docs/DEMO.md](docs/DEMO.md)**.
 

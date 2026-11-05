@@ -10,7 +10,7 @@ The diagrams below are Mermaid (GitHub draws them). An illustrated version: [arc
 ## 1. Where everything runs
 ```mermaid
 flowchart LR
-  B[Browser] -->|:5173| W[Web app<br/>Vite + React + three.js<br/>Lab · Scan · 3D world · sim.html]
+  B[Browser] -->|:5173| W[Web app<br/>Vite + React + three.js<br/>landing · app.html: Lab, Scan, 3D points · sim.html]
   W -->|/api, /media proxied| E[PhysLens engine<br/>FastAPI :8000<br/>holds the keys and the $ cap]
   E -->|SAM 3.1 · Muse Spark · Muse Voice| META[Meta Model API<br/>api.meta.ai]
   E -->|MapAnything · MoGe-3| GPU[RunPod serverless GPU<br/>scales to zero]

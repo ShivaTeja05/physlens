@@ -1,7 +1,12 @@
 import { Canvas, useThree } from '@react-three/fiber'
+import Safe3D from './Safe3D'
+import SpecsPanel from './SpecsPanel'
 import { Html, Line, OrbitControls } from '@react-three/drei'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import * as THREE from 'three'
+import { ArrowCounterClockwise, ArrowDown, ArrowLeft, ArrowRight, Lightning, Pause, Play, Square, StopCircle } from '@phosphor-icons/react'
+import Logo from './design/Logo'
+import { failure } from './api'
 
 // Mirrors backend/physlens/pointworld.py (format physlens-pointworld/1) and the notes benchmark/world_events.py and
 // benchmark/crash3d.py add (events, the rigid body at each moment, structures, checks).
@@ -33,9 +38,17 @@ type Notes = {
 /** What the scene's camera controls (drei's OrbitControls) need to expose here. */
 type Controls = { target: THREE.Vector3; update: () => void }
 
-async function load(base: string, name: string): Promise<Loaded> {
+/** A file of a world, or a readable reason it couldn't be fetched (missing world, engine not running). */
+async function grab(url: string, signal: AbortSignal, init: RequestInit = {}): Promise<Response> {
+  const r = await fetch(url, { ...init, signal })
+  if (r.status === 404) throw new Error('This world is not on the engine. Export it with benchmark/export_pointworlds.py.')
+  if (!r.ok) throw await failure(r)
+  return r
+}
+
+async function load(base: string, name: string, signal: AbortSignal): Promise<Loaded> {
   // The header is small and gains notes (events, checks) after export: always revalidated.
-  const header: Header = await (await fetch(`${base}${name}.json`, { cache: 'no-cache' })).json()
+  const header: Header = await (await grab(`${base}${name}.json`, signal, { cache: 'no-cache' })).json()
   // The points: one binary file from the engine, or base64 text parts in a static shared copy
   // (benchmark/web_copy.py; artifact hosting serves text, not raw binary).
   let buf: ArrayBuffer
@@ -43,15 +56,17 @@ async function load(base: string, name: string): Promise<Loaded> {
     const bytes = new Uint8Array(header.bin_bytes ?? 0)
     let at = 0, carry = ''
     for (const p of header.bin_parts) {
-      const text = carry + (await (await fetch(`${base}${p}`)).text())
+      const text = carry + (await (await grab(`${base}${p}`, signal)).text())
       const whole = text.length - (text.length % 4)
       const bin = atob(text.slice(0, whole))
       carry = text.slice(whole)
       for (let i = 0; i < bin.length; i++) bytes[at++] = bin.charCodeAt(i)
     }
     buf = bytes.buffer
-  } else buf = await (await fetch(`${base}${name}.bin`)).arrayBuffer()
+  } else buf = await (await grab(`${base}${name}.bin`, signal)).arrayBuffer()
   const n = header.points
+  // 6 bytes of position and 3 of colour per point: a shorter file is a cut-off download.
+  if (buf.byteLength < n * 9) throw new Error(`The points file stopped early (${(buf.byteLength / 1e6).toFixed(1)} of ${(n * 9 / 1e6).toFixed(1)} MB). Reload to try again.`)
   const q = new Int16Array(buf, 0, n * 3)
   const colours = new Uint8Array(buf, n * 6, n * 3)
   const positions = new Float32Array(n * 3)
@@ -208,11 +223,16 @@ function ViewSetter({ header, controls, view }: { header: Header; controls: Reac
   return null
 }
 
-const KIND_ICON: Record<string, string> = { cruise: '→', braking: '⏷', contact: '✸', impact: '✸', crush: '▣', stop: '■', rebound: '↩', peak_speed: '→' }
+const KIND_ICON: Record<string, typeof ArrowRight> = { cruise: ArrowRight, braking: ArrowDown, contact: Lightning, impact: Lightning, crush: Square, stop: StopCircle, rebound: ArrowCounterClockwise, peak_speed: ArrowRight }
+function KindIcon({ kind }: { kind: string }) {
+  const Icon = KIND_ICON[kind] ?? ArrowRight
+  return <Icon weight="bold" aria-hidden />
+}
 
 // The simulator's body (benchmark/simulate_worlds.py): one body of real points in its own coordinates (groups 254:
 // real colours, 253: coloured by how many frames saw each spot) and a pose per frame while it is rigid.
 type Pose = { frame: number; t: number; used: boolean; x?: number; y?: number; z?: number; yaw?: number; rms?: number }
+type World = { name: string; title: string; points: number }
 type Face = { covered_pct: number; area_m2: number; most_frames_on_a_spot: number; points: number }
 type BodyNote = {
   poses: Pose[]; rigid_until_t: number | null; after_rigid: string | null; points: number; frames_used: number; frames: number
@@ -269,7 +289,7 @@ const FACE_NAMES: Record<string, string> = { front: 'Front', rear: 'Rear', left:
 type Props = { base?: string; initial?: string; standalone?: boolean }
 
 export default function PointWorld({ base = '/media/pointworld/', initial, standalone = false }: Props) {
-  const [worlds, setWorlds] = useState<{ name: string; title: string; points: number }[]>([])
+  const [worlds, setWorlds] = useState<World[]>([])
   const [name, setName] = useState<string | undefined>(initial)
   const [data, setData] = useState<Loaded>()
   const [loading, setLoading] = useState(false)
@@ -290,24 +310,32 @@ export default function PointWorld({ base = '/media/pointworld/', initial, stand
   const [showPred, setShowPred] = useState(true)
   const controls = useRef<Controls | null>(null)
 
+  const [listErr, setListErr] = useState<string>()
   useEffect(() => {
-    fetch(`${base}index.json`).then((r) => r.json()).then((w) => {
-      setWorlds(w)
-      if (w.length) setName((cur) => cur || w[0].name)                   // keep a world already picked
-    }).catch(() => setWorlds([]))
+    const ctl = new AbortController()
+    grab(`${base}index.json`, ctl.signal, { cache: 'no-cache' }).then((r) => r.json()).then((w: World[]) => {
+      setWorlds(w); setListErr(undefined)
+      // Keep a world already picked if it exists; a link to one that doesn't opens the first instead.
+      if (w.length) setName((cur) => (cur && w.some((x) => x.name === cur) ? cur : w[0].name))
+    }).catch((e) => { if (!ctl.signal.aborted) { setWorlds([]); setListErr(e instanceof Error ? e.message : String(e)) } })
+    return () => ctl.abort()
   }, [base])
   useEffect(() => {
-    if (!name) return
+    if (!name || !worlds.some((w) => w.name === name)) return
+    // Switching worlds cancels the download in flight, so a slow world can never land over the one now picked.
+    const ctl = new AbortController()
     setLoading(true); setErr(undefined); setData(undefined); setK(0); setPlaying(false); setView('camera'); setAnswer(undefined)
     if (standalone) history.replaceState(null, '', `#${name}`)
-    load(base, name).then((d) => {
+    load(base, name, ctl.signal).then((d) => {
       setData(d)
       if (d.header.decimated_from) setSize(1.8)
       const objs = d.header.groups.filter((g) => g.tag !== 255 && g.tag < PREDICTED)
       setTSim(objs[0]?.t ?? 0)
       setMode(d.header.groups.some((g) => g.tag === BODY) ? 'sim' : 'frames')
-    }).catch((e) => setErr(String(e))).finally(() => setLoading(false))
-  }, [name, base, standalone])
+    }).catch((e) => { if (!ctl.signal.aborted) setErr(e instanceof Error ? e.message : String(e)) })
+      .finally(() => { if (!ctl.signal.aborted) setLoading(false) })
+    return () => ctl.abort()
+  }, [name, base, standalone, worlds])
   const objectGroups = data ? data.header.groups.filter((g) => g.tag !== 255 && g.tag < PREDICTED) : []
   const predGroup = data?.header.groups.find((g) => g.tag === PREDICTED)
   const bodyGroup = data?.header.groups.find((g) => g.tag === BODY)
@@ -371,10 +399,10 @@ export default function PointWorld({ base = '/media/pointworld/', initial, stand
     fd.append('question', q)
     try {
       const r = await fetch('/api/ask', { method: 'POST', body: fd })
-      const j = await r.json()
-      setAnswer(r.ok ? j.answer : `Couldn't ask: ${j.detail ?? r.status}`)
+      if (!r.ok) throw await failure(r)
+      setAnswer((await r.json()).answer)
     } catch (e) {
-      setAnswer(`Couldn't ask: ${e}`)
+      setAnswer(`Couldn't ask: ${e instanceof Error ? e.message : e}`)
     } finally {
       setAsking(false)
     }
@@ -382,31 +410,32 @@ export default function PointWorld({ base = '/media/pointworld/', initial, stand
 
   return (
     <div className={`pw ${standalone ? 'pw-standalone' : ''}`}>
-      {standalone && <div className="pw-brand"><b>PhysLens</b> · video → measured 3D world → physical events</div>}
+      {standalone && <div className="pw-brand"><a href="./"><ArrowLeft weight="bold" aria-hidden /><Logo /> PhysLens</a> Simulator · video in, measured 3D world out, physical events found</div>}
       <div className="pw-bar">
         {worlds.map((w) => (
           <button key={w.name} className={w.name === name ? 'on' : ''} onClick={() => setName(w.name)}>{w.title}</button>
         ))}
-        {!worlds.length && <span>No point worlds yet: run benchmark/export_pointworlds.py</span>}
+        {!worlds.length && <span className="pw-note">{listErr ?? 'No point worlds yet: run benchmark/export_pointworlds.py'}</span>}
       </div>
       <div className="pw-stage">
-        {loading && <div className="pw-loading">Loading points…</div>}
-        {err && <div className="pw-loading">Couldn't load this world: {err}</div>}
+        {loading && <div className="pw-loading"><div className="skeleton"><span /><span /><span /></div>Loading the measured points</div>}
+        {err && <div className="pw-loading" role="alert">Couldn't load this world. {err}</div>}
         {data && (
           <div className="pw-views">
             {(['camera', 'top', 'side', ...(contactEv ? ['event'] : [])] as View[]).map((v) => (
-              <button key={v} className={view === v ? 'on' : ''} onClick={() => setView(v)}>{{ camera: 'Camera view', top: "Bird's-eye", side: 'Side', event: `${contactEv?.kind === 'impact' ? 'Impact' : 'Contact'} close-up` }[v]}</button>
+              <button key={v} className={view === v ? 'on' : ''} onClick={() => setView(v)}>{{ camera: 'Camera view', top: 'From above', side: 'Side', event: `${contactEv?.kind === 'impact' ? 'Impact' : 'Contact'} close up` }[v]}</button>
             ))}
           </div>
         )}
-        {lastEvent && <div className={`pw-event-now ${lastEvent === contactEv ? 'hot' : ''}`}>{KIND_ICON[lastEvent.kind] ?? '•'} {lastEvent.label}</div>}
+        {lastEvent && <div className={`pw-event-now ${lastEvent === contactEv ? 'hot' : ''}`}><KindIcon kind={lastEvent.kind} /> {lastEvent.label}</div>}
         {sim && !pose && objectGroups.length > 0 && (
           <div className="pw-mode-note">{bodyNote?.rigid_until_t !== null && bodyNote && tSim > (bodyNote.rigid_until_t ?? 0)
             ? `Measured points of this moment: the body isn't rigid any more (${bodyNote.after_rigid ?? 'it deforms'})`
             : 'Measured points of this moment: the body is only partly in view'}</div>
         )}
         {data && h && (
-          <Canvas camera={{ near: 0.05, far: 500 }} gl={{ antialias: false }} style={{ background: '#05070c' }}>
+          <Safe3D>
+          <Canvas camera={{ near: 0.05, far: 500 }} gl={{ antialias: false }} style={{ background: '#000000' }}>
             <ViewSetter header={h} controls={controls} view={view} />
             {/* drei types its ref as three-stdlib's OrbitControls; only target and update are used here */}
             <OrbitControls ref={controls as never} makeDefault enableDamping />
@@ -434,6 +463,7 @@ export default function PointWorld({ base = '/media/pointworld/', initial, stand
             {((notes.cameras ?? []) as Cam[]).map((c) => <CameraMarker key={c.name} c={c} />)}
             <gridHelper args={[60, 60, '#1d3b4f', '#0f1d28']} />
           </Canvas>
+          </Safe3D>
         )}
       </div>
       {data && h && (
@@ -445,7 +475,7 @@ export default function PointWorld({ base = '/media/pointworld/', initial, stand
                 <button className={!sim ? 'on' : ''} onClick={() => { setPlaying(false); setMode('frames'); setK(indexAt(tSim)) }}>Raw frames</button>
               </div>
             )}
-            <button onClick={() => setPlaying((p) => !p)}>{playing ? 'Pause' : 'Play'}</button>
+            <button onClick={() => setPlaying((p) => !p)}>{playing ? <><Pause weight="fill" aria-hidden /> Pause</> : <><Play weight="fill" aria-hidden /> Play</>}</button>
             <div className="pw-timeline">
               {sim
                 ? <input type="range" min={tFirst} max={tLast} step={0.001} value={tSim} onChange={(e) => { setPlaying(false); setTSim(+e.target.value) }} />
@@ -454,7 +484,7 @@ export default function PointWorld({ base = '/media/pointworld/', initial, stand
                 const x = (e.t - tFirst) / Math.max(tLast - tFirst, 1e-6)
                 if (x < -0.02 || x > 1.02) return null
                 return <button key={i} className={`pw-tick ${e.kind}`} style={{ left: `${Math.min(Math.max(x, 0), 1) * 100}%` }} title={e.label}
-                  onClick={() => jump(e.t)}>{KIND_ICON[e.kind] ?? '•'}</button>
+                  onClick={() => jump(e.t)}><KindIcon kind={e.kind} /></button>
               })}
             </div>
             <span>t = {tNow?.toFixed(2)} s (frame {frameNow})</span>
@@ -474,7 +504,7 @@ export default function PointWorld({ base = '/media/pointworld/', initial, stand
                 <button key={i} className={`pw-ev ${reached(e) ? 'past' : ''} ${e === contactEv ? 'key' : ''}`}
                   onClick={() => jump(e.t)}>
                   <span className="pw-ev-t">{e.t.toFixed(2)} s</span>
-                  <span className="pw-ev-l">{KIND_ICON[e.kind] ?? '•'} {e.label}</span>
+                  <span className="pw-ev-l"><KindIcon kind={e.kind} /> {e.label}</span>
                   {e.detail && <span className="pw-ev-d">{e.detail}</span>}
                   {e.truth && <span className="pw-ev-truth">{e.truth}</span>}
                 </button>
@@ -527,6 +557,7 @@ export default function PointWorld({ base = '/media/pointworld/', initial, stand
               {answer && <div className="pw-answer">{answer}</div>}
             </div>
           )}
+          {name && <SpecsPanel world={name} />}
           <div className="pw-facts">
             <div><b>{h.points.toLocaleString()}</b> points{h.decimated_from ? ` (web copy of ${h.decimated_from.toLocaleString()})` : ''}: {h.static_points.toLocaleString()} world, {h.object_points.toLocaleString()} {h.object} ({objectGroups.length} moments)</div>
             {box && <div>{h.object} now (visible points): <b>{box.size[0].toFixed(2)} m</b> long × <b>{box.size[2].toFixed(2)} m</b> wide × <b>{box.size[1].toFixed(2)} m</b> high, from {box.points.toLocaleString()} points{speed !== undefined && <> · <b>{speed} km/h</b></>}</div>}
@@ -543,7 +574,7 @@ export default function PointWorld({ base = '/media/pointworld/', initial, stand
               <div className="pw-chart-wrap">
                 <div className="pw-events-title">Crush: how far the car's rear kept moving after impact</div>
                 <CrushChart c={notes.crush_curve} />
-                <div className="pw-note"><span className="pw-key-video">blue</span>: the car's rear part tracked in the 1,000 fps camera (2D tracking, metric on its side plane) · <span className="pw-key-sensor">line</span>: NHTSA's rear-floor accelerometers, integrated</div>
+                <div className="pw-note"><span className="pw-key-video">dots</span>: the car's rear part tracked in the 1,000 fps camera (2D tracking, metric on its side plane) · <span className="pw-key-sensor">line</span>: NHTSA's rear-floor accelerometers, integrated</div>
               </div>
             )}
             {notes.truth_table && (

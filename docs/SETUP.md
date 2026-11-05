@@ -21,8 +21,8 @@ Health check: http://localhost:8000/api/health. Spend so far: http://localhost:8
 ```bash
 cd web
 pnpm install
-pnpm dev            # http://localhost:5173 (Lab, Scan), http://localhost:5173/sim.html (3D simulator)
-pnpm build          # production build into web/dist (index.html + sim.html)
+pnpm dev            # http://localhost:5173 (landing), /app.html (Lab, Scan, 3D points), /sim.html (3D simulator)
+pnpm build          # production build into web/dist (index.html, app.html, sim.html, 404.html)
 ```
 The dev server proxies `/api` and `/media` to the engine on :8000.
 
@@ -34,6 +34,7 @@ The dev server proxies `/api` and `/media` to the engine on :8000.
 | `PHYSLENS_BUDGET_USD` | spending cap for Meta calls (default 50) |
 | `RUNPOD_API_KEY`, `RUNPOD_ENDPOINT_ID` | the GPU worker for MapAnything and MoGe-3 |
 | `PHYSLENS_TRACKER=motion` | force the offline tracker |
+| `PHYSLENS_ALLOWED_ORIGINS`, `PHYSLENS_ALLOWED_HOSTS` | only if the web app is served from somewhere other than this machine: extra origins / host names allowed to call the engine (comma separated). By default only local pages can use it, so another website open in your browser can't spend the budget or read your records |
 Each teammate uses their own key. Don't paste keys into code, issues, chat or commits.
 
 ## 4. GPU worker (only for building 3D worlds)

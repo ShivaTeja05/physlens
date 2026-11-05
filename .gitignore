@@ -22,3 +22,6 @@ datasets/
 records/
 benchmark/cache/
 .claude/
+
+# playwright-cli page snapshots and logs from local testing
+web/.playwright-cli/

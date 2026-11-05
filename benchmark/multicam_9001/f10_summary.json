@@ -1,0 +1,77 @@
+{
+ "cam01_overhead_wide": {
+  "position": [
+   -0.003,
+   0.0,
+   0.009
+  ],
+  "forward": [
+   0.0,
+   0.0,
+   1.0
+  ],
+  "fov_x_deg": 62.3,
+  "median_depth_m": 6.18,
+  "points": 172130
+ },
+ "cam02": {
+  "position": [
+   0.267,
+   0.32,
+   1.451
+  ],
+  "forward": [
+   -0.036,
+   -0.032,
+   0.999
+  ],
+  "fov_x_deg": 61.9,
+  "median_depth_m": 4.6,
+  "points": 175322
+ },
+ "cam04_struck_side": {
+  "position": [
+   2.225,
+   6.25,
+   5.361
+  ],
+  "forward": [
+   -0.344,
+   -0.926,
+   0.156
+  ],
+  "fov_x_deg": 61.5,
+  "median_depth_m": 5.98,
+  "points": 156690
+ },
+ "cam05_rear_impact": {
+  "position": [
+   9.138,
+   -4.222,
+   6.008
+  ],
+  "forward": [
+   -0.962,
+   0.193,
+   0.192
+  ],
+  "fov_x_deg": 61.8,
+  "median_depth_m": 6.41,
+  "points": 157098
+ },
+ "cam06_front_oblique": {
+  "position": [
+   -4.789,
+   6.888,
+   5.196
+  ],
+  "forward": [
+   0.329,
+   -0.899,
+   0.289
+  ],
+  "fov_x_deg": 61.1,
+  "median_depth_m": 6.57,
+  "points": 156035
+ }
+}

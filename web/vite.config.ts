@@ -9,8 +9,8 @@ export default defineConfig({
   // Relative asset paths, so the built simulator page also works from a static folder (a shared copy).
   base: './',
   build: {
-    // Both pages, relative to this folder (Vite's root), so no Node types are needed to type-check this file.
-    rollupOptions: { input: { main: 'index.html', sim: 'sim.html' } },
+    // The pages (landing, Lab, simulator), relative to this folder (Vite's root), so no Node types are needed to type-check this file.
+    rollupOptions: { input: { main: 'index.html', app: 'app.html', sim: 'sim.html' } },
   },
   server: {
     port: 5173,
